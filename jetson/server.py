@@ -196,10 +196,10 @@ def postprocess(output, conf_threshold, iou_threshold, scale, pad_x, pad_y):
 # Stage 2: LLM confirmation
 # ---------------------------------------------------------------------------
 
-def confirm_with_llm(image_bytes):
-    """Ask Kimi K2.5 whether this is a delivery truck. Returns True/False."""
+def confirm_with_llm(image_bytes, retries=2):
+    """Ask LLM whether this is a delivery truck. Returns True/False."""
     if not OPENROUTER_API_KEY:
-        log.warning("No OPENROUTER_API_KEY — skipping LLM confirmation, treating as positive")
+        log.warning("No OPENROUTER_API_KEY — skipping LLM, treating as positive")
         return True
 
     b64_image = base64.b64encode(image_bytes).decode("utf-8")
@@ -218,11 +218,13 @@ def confirm_with_llm(image_bytes):
                     {
                         "type": "text",
                         "text": (
-                            "Is there a delivery truck in this image — "
-                            "such as UPS, FedEx, USPS, Amazon, DHL, or an "
-                            "unmarked box truck that appears to be making "
-                            "deliveries? Moving vans, garbage trucks, buses, "
-                            "and regular cars do NOT count. "
+                            "Is there a package delivery truck in this image — "
+                            "such as a UPS, FedEx, USPS, Amazon, or DHL vehicle, "
+                            "or an unmarked box truck with a driver carrying "
+                            "packages? Say NO for: moving vans, garbage trucks, "
+                            "buses, fire trucks, ambulances, police cars, food "
+                            "trucks, ice cream trucks, utility trucks, tow trucks, "
+                            "construction vehicles, and regular cars/SUVs/pickups. "
                             "Reply YES or NO only."
                         ),
                     },
@@ -236,17 +238,22 @@ def confirm_with_llm(image_bytes):
         "Content-Type": "application/json",
     }
 
-    try:
-        resp = requests.post(OPENROUTER_URL, json=payload, headers=headers, timeout=30)
-        resp.raise_for_status()
-        msg = resp.json()["choices"][0]["message"]
-        answer = (msg.get("content") or "").strip().upper()
-        is_delivery = "YES" in answer
-        log.info("LLM confirmation: %s -> %s", answer, "DELIVERY" if is_delivery else "NOT DELIVERY")
-        return is_delivery
-    except Exception as e:
-        log.error("LLM confirmation failed: %s — treating as positive", e)
-        return True  # fail open: notify anyway if LLM is down
+    for attempt in range(retries + 1):
+        try:
+            resp = requests.post(OPENROUTER_URL, json=payload, headers=headers, timeout=30)
+            resp.raise_for_status()
+            msg = resp.json()["choices"][0]["message"]
+            answer = (msg.get("content") or "").strip().upper()
+            is_delivery = "YES" in answer
+            log.info("LLM confirmation: %s -> %s", answer, "DELIVERY" if is_delivery else "NOT DELIVERY")
+            return is_delivery
+        except Exception as e:
+            if attempt < retries:
+                log.warning("LLM attempt %d failed: %s — retrying", attempt + 1, e)
+                time.sleep(1)
+            else:
+                log.error("LLM failed after %d attempts: %s — treating as positive", retries + 1, e)
+                return True
 
 
 # ---------------------------------------------------------------------------
