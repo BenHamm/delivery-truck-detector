@@ -1,0 +1,15 @@
+[Unit]
+Description=Delivery truck detection server
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+User=orin
+WorkingDirectory=/home/orin/truck-detector
+EnvironmentFile=/home/orin/truck-detector/.env
+ExecStart=/usr/bin/python3 server.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
