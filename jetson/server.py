@@ -44,7 +44,7 @@ YOLO_MODEL_PATH = os.environ.get("YOLO_MODEL_PATH", "yolov8n.engine")
 INPUT_SIZE = 640
 # COCO classes: 5=bus, 7=truck — delivery trucks register as either
 VEHICLE_CLASS_IDS = {5, 7}
-CONFIDENCE_THRESHOLD = float(os.environ.get("CONFIDENCE_THRESHOLD", "0.35"))
+CONFIDENCE_THRESHOLD = float(os.environ.get("CONFIDENCE_THRESHOLD", "0.20"))
 NMS_IOU_THRESHOLD = float(os.environ.get("NMS_IOU_THRESHOLD", "0.45"))
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
@@ -218,13 +218,11 @@ def confirm_with_llm(image_bytes, retries=2):
                     {
                         "type": "text",
                         "text": (
-                            "Is there a package delivery truck in this image — "
-                            "such as a UPS, FedEx, USPS, Amazon, or DHL vehicle, "
-                            "or an unmarked box truck with a driver carrying "
-                            "packages? Say NO for: moving vans, garbage trucks, "
-                            "buses, fire trucks, ambulances, police cars, food "
-                            "trucks, ice cream trucks, utility trucks, tow trucks, "
-                            "construction vehicles, and regular cars/SUVs/pickups. "
+                            "Is there a UPS or FedEx delivery truck clearly "
+                            "visible in this image? ONLY say YES for vehicles "
+                            "with UPS or FedEx branding. Say NO for all other "
+                            "vehicles including Amazon, USPS, unmarked vans, "
+                            "and anything else. "
                             "Reply YES or NO only."
                         ),
                     },
