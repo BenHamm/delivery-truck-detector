@@ -46,6 +46,8 @@ INTERVAL = int(os.environ.get("INTERVAL_SECONDS", "30"))
 COOLDOWN = int(os.environ.get("COOLDOWN_SECONDS", "600"))
 START_HOUR = int(os.environ.get("START_HOUR", "8"))
 END_HOUR = int(os.environ.get("END_HOUR", "20"))
+CALIBRATION_MODE = os.environ.get("CALIBRATION_MODE", "").lower() in ("1", "true", "yes")
+CALIBRATION_DIR = os.environ.get("CALIBRATION_DIR", "/home/pi/calibration")
 
 last_notification_time = 0
 clear_streak = 0  # consecutive checks with no vehicle
@@ -76,14 +78,18 @@ def stage1_roboflow(image_path):
     )
     resp.raise_for_status()
 
+    all_predictions = resp.json().get("predictions", [])
     best_conf = 0
     best_class = ""
-    for p in resp.json().get("predictions", []):
-        if p["class"] in VEHICLE_CLASSES and p["confidence"] > best_conf:
-            best_conf = p["confidence"]
-            best_class = p["class"]
+    vehicle_preds = []
+    for p in all_predictions:
+        if p["class"] in VEHICLE_CLASSES:
+            vehicle_preds.append(p)
+            if p["confidence"] > best_conf:
+                best_conf = p["confidence"]
+                best_class = p["class"]
 
-    return best_conf > 0, best_conf, best_class
+    return best_conf > 0, best_conf, best_class, vehicle_preds
 
 
 def stage2_gemini(image_path):
@@ -211,7 +217,7 @@ def main():
             grab_frame(rtsp_url, tmp_path)
 
             # Stage 1: Roboflow YOLO (free)
-            detected, conf, cls = stage1_roboflow(tmp_path)
+            detected, conf, cls, vehicle_preds = stage1_roboflow(tmp_path)
             frame_count += 1
 
             if not detected:
@@ -228,16 +234,35 @@ def main():
 
             # Skip stage 2 if cooldown is active (same truck still there)
             now = time.time()
-            if now - last_notification_time < COOLDOWN:
+            if not CALIBRATION_MODE and now - last_notification_time < COOLDOWN:
                 time.sleep(INTERVAL)
                 continue
 
             log.info("Stage 1: %s detected (conf=%.2f) — checking with Gemini...", cls, conf)
 
             # Stage 2: Gemini confirmation (costs ~$0.0006)
-            if stage2_gemini(tmp_path):
+            is_delivery = stage2_gemini(tmp_path)
+
+            # Calibration mode: save every stage 1 hit with metadata
+            if CALIBRATION_MODE:
+                import shutil, json
+                os.makedirs(CALIBRATION_DIR, exist_ok=True)
+                ts = time.strftime("%Y%m%d_%H%M%S")
+                verdict = "YES" if is_delivery else "NO"
+                fname = f"{verdict}_{cls}_{conf:.2f}_{ts}"
+                shutil.copy(tmp_path, os.path.join(CALIBRATION_DIR, fname + ".jpg"))
+                with open(os.path.join(CALIBRATION_DIR, fname + ".json"), "w") as jf:
+                    json.dump({"timestamp": ts, "roboflow_class": cls,
+                               "roboflow_conf": round(conf, 3), "gemini_verdict": verdict,
+                               "vehicle_boxes": vehicle_preds}, jf, indent=2)
+                log.info("Calibration saved: %s", fname)
+
+            if is_delivery:
                 log.info(">>> DELIVERY TRUCK CONFIRMED!")
-                send_notification(tmp_path)
+                if not CALIBRATION_MODE:
+                    send_notification(tmp_path)
+                else:
+                    log.info("(calibration mode — notification suppressed)")
             else:
                 log.info("Gemini says not a delivery truck — skipping")
 
