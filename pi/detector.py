@@ -5,12 +5,17 @@ Delivery truck detector — Pi-only, two-stage.
 Stage 1: Roboflow hosted YOLO (free tier) detects truck/bus class
 Stage 2: Gemini Flash confirms UPS/FedEx branding (only when stage 1 triggers)
 
+All stage 1 hits are saved with metadata in a rolling 36-hour window.
+
 Cost: ~$0.30/month (Roboflow free, Gemini only on detections)
 """
 
 import os
 import sys
 import time
+import json
+import glob
+import shutil
 import base64
 import tempfile
 import subprocess
@@ -46,12 +51,14 @@ INTERVAL = int(os.environ.get("INTERVAL_SECONDS", "30"))
 COOLDOWN = int(os.environ.get("COOLDOWN_SECONDS", "600"))
 START_HOUR = int(os.environ.get("START_HOUR", "8"))
 END_HOUR = int(os.environ.get("END_HOUR", "20"))
-CALIBRATION_MODE = os.environ.get("CALIBRATION_MODE", "").lower() in ("1", "true", "yes")
-CALIBRATION_DIR = os.environ.get("CALIBRATION_DIR", "/home/pi/calibration")
+
+# Rolling image log
+LOG_DIR = os.environ.get("LOG_DIR", "/home/pi/detections")
+LOG_RETENTION_HOURS = int(os.environ.get("LOG_RETENTION_HOURS", "36"))
 
 last_notification_time = 0
-clear_streak = 0  # consecutive checks with no vehicle
-CLEAR_STREAK_RESET = 3  # reset cooldown after this many clear checks
+clear_streak = 0
+CLEAR_STREAK_RESET = 3
 
 
 def grab_frame(rtsp_url, output_path):
@@ -65,7 +72,7 @@ def grab_frame(rtsp_url, output_path):
 
 
 def stage1_roboflow(image_path):
-    """Roboflow YOLO: detect truck/bus. Returns (detected, best_conf, class_name)."""
+    """Roboflow YOLO: detect truck/bus. Returns (detected, best_conf, class_name, vehicle_preds)."""
     with open(image_path, "rb") as f:
         img_b64 = base64.b64encode(f.read()).decode()
 
@@ -139,6 +146,38 @@ def stage2_gemini(image_path):
                 return False
 
 
+def save_detection(image_path, cls, conf, vehicle_preds, gemini_verdict):
+    """Save stage 1 hit to rolling log directory."""
+    os.makedirs(LOG_DIR, exist_ok=True)
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    verdict = "YES" if gemini_verdict else "NO"
+    fname = f"{verdict}_{cls}_{conf:.2f}_{ts}"
+    shutil.copy(image_path, os.path.join(LOG_DIR, fname + ".jpg"))
+    with open(os.path.join(LOG_DIR, fname + ".json"), "w") as jf:
+        json.dump({
+            "timestamp": ts,
+            "roboflow_class": cls,
+            "roboflow_conf": round(conf, 3),
+            "gemini_verdict": verdict,
+            "vehicle_boxes": vehicle_preds,
+        }, jf, indent=2)
+
+
+def cleanup_old_detections():
+    """Remove detection files older than LOG_RETENTION_HOURS."""
+    cutoff = time.time() - LOG_RETENTION_HOURS * 3600
+    removed = 0
+    for f in glob.glob(os.path.join(LOG_DIR, "*")):
+        try:
+            if os.path.getmtime(f) < cutoff:
+                os.remove(f)
+                removed += 1
+        except OSError:
+            pass
+    if removed:
+        log.info("Cleaned up %d old detection files", removed)
+
+
 def send_notification(image_path):
     global last_notification_time
 
@@ -201,10 +240,12 @@ def main():
 
     log.info("Detector starting (every %ds, active %d:00-%d:00)", INTERVAL, START_HOUR, END_HOUR)
     log.info("Stage 1: Roboflow %s | Stage 2: Gemini Flash", ROBOFLOW_MODEL)
+    log.info("Detection log: %s (%dh retention)", LOG_DIR, LOG_RETENTION_HOURS)
 
     global clear_streak, last_notification_time
 
     frame_count = 0
+    last_cleanup = 0
     while True:
         try:
             if not in_active_hours():
@@ -234,7 +275,7 @@ def main():
 
             # Skip stage 2 if cooldown is active (same truck still there)
             now = time.time()
-            if not CALIBRATION_MODE and now - last_notification_time < COOLDOWN:
+            if now - last_notification_time < COOLDOWN:
                 time.sleep(INTERVAL)
                 continue
 
@@ -243,28 +284,19 @@ def main():
             # Stage 2: Gemini confirmation (costs ~$0.0006)
             is_delivery = stage2_gemini(tmp_path)
 
-            # Calibration mode: save every stage 1 hit with metadata
-            if CALIBRATION_MODE:
-                import shutil, json
-                os.makedirs(CALIBRATION_DIR, exist_ok=True)
-                ts = time.strftime("%Y%m%d_%H%M%S")
-                verdict = "YES" if is_delivery else "NO"
-                fname = f"{verdict}_{cls}_{conf:.2f}_{ts}"
-                shutil.copy(tmp_path, os.path.join(CALIBRATION_DIR, fname + ".jpg"))
-                with open(os.path.join(CALIBRATION_DIR, fname + ".json"), "w") as jf:
-                    json.dump({"timestamp": ts, "roboflow_class": cls,
-                               "roboflow_conf": round(conf, 3), "gemini_verdict": verdict,
-                               "vehicle_boxes": vehicle_preds}, jf, indent=2)
-                log.info("Calibration saved: %s", fname)
+            # Save every stage 1 hit with Gemini verdict
+            save_detection(tmp_path, cls, conf, vehicle_preds, is_delivery)
 
             if is_delivery:
                 log.info(">>> DELIVERY TRUCK CONFIRMED!")
-                if not CALIBRATION_MODE:
-                    send_notification(tmp_path)
-                else:
-                    log.info("(calibration mode — notification suppressed)")
+                send_notification(tmp_path)
             else:
                 log.info("Gemini says not a delivery truck — skipping")
+
+            # Cleanup old files once per hour
+            if now - last_cleanup > 3600:
+                cleanup_old_detections()
+                last_cleanup = now
 
         except KeyboardInterrupt:
             break
