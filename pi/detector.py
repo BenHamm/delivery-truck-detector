@@ -1,25 +1,22 @@
 #!/usr/bin/env python3
 """
-Delivery truck detector — Pi-only, two-stage.
+Delivery truck detector — Pi-only, single-stage.
 
-Stage 1: Roboflow hosted YOLO (free tier) detects truck/bus class
-Stage 2: Gemini Flash confirms UPS/FedEx branding (only when stage 1 triggers)
+Stage 1: Gemini Flash directly confirms UPS/FedEx branding on every frame.
 
-All stage 1 hits are saved with metadata in a rolling 36-hour window.
-
-Cost: ~$0.30/month (Roboflow free, Gemini only on detections)
+Cost: ~$1.50/month (Gemini Flash via OpenRouter on every poll)
 """
 
 import os
 import sys
 import time
-import json
 import glob
 import shutil
 import base64
 import tempfile
 import subprocess
 import logging
+import signal
 
 import requests
 
@@ -32,13 +29,7 @@ CAMERA_USER = os.environ.get("CAMERA_USER", "orintapo")
 CAMERA_PASS = os.environ.get("CAMERA_PASS", "nvidia")
 STREAM = os.environ.get("STREAM", "stream1")
 
-# Roboflow (free tier — stage 1)
-ROBOFLOW_API_KEY = os.environ.get("ROBOFLOW_API_KEY", "")
-ROBOFLOW_MODEL = os.environ.get("ROBOFLOW_MODEL", "coco/3")
-ROBOFLOW_CONFIDENCE = int(os.environ.get("ROBOFLOW_CONFIDENCE", "20"))
-VEHICLE_CLASSES = {"truck", "bus"}  # delivery trucks register as either
-
-# Gemini (stage 2 — only called on detections)
+# Gemini Flash (single stage — called on every frame)
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-3-flash-preview")
 
@@ -55,6 +46,11 @@ END_HOUR = int(os.environ.get("END_HOUR", "20"))
 # Rolling image log
 LOG_DIR = os.environ.get("LOG_DIR", "/home/pi/detections")
 LOG_RETENTION_HOURS = int(os.environ.get("LOG_RETENTION_HOURS", "36"))
+NO_SAMPLE_INTERVAL = int(os.environ.get("NO_SAMPLE_INTERVAL", "1800"))  # save 1 NO frame every 30min
+
+# Healthchecks.io dead-man's switch
+HC_PING_URL = os.environ.get("HC_PING_URL", "https://hc-ping.com/1d4cb30e-1d3e-4425-b6d9-f1f93590ca4c")
+HC_INTERVAL = 1800  # ping every 30 minutes
 
 last_notification_time = 0
 clear_streak = 0
@@ -71,96 +67,109 @@ def grab_frame(rtsp_url, output_path):
         raise RuntimeError("ffmpeg: " + result.stderr.decode().strip())
 
 
-def stage1_roboflow(image_path):
-    """Roboflow YOLO: detect truck/bus. Returns (detected, best_conf, class_name, vehicle_preds)."""
-    with open(image_path, "rb") as f:
-        img_b64 = base64.b64encode(f.read()).decode()
+def call_gemini(image_path, alarm_s=25):
+    """Gemini Flash: confirm UPS/FedEx. Returns True/False.
 
-    resp = requests.post(
-        "https://detect.roboflow.com/" + ROBOFLOW_MODEL,
-        params={"api_key": ROBOFLOW_API_KEY, "confidence": ROBOFLOW_CONFIDENCE},
-        data=img_b64,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        timeout=30,
-    )
-    resp.raise_for_status()
+    Hard SIGALRM backstop prevents a stalled HTTP call from blocking
+    long enough to trigger the systemd watchdog (1 min). alarm_s=25 for
+    primary polls, alarm_s=15 for confirm polls (where worst-case must
+    stack under 60s: 25 + 5 sleep + 15 = 45s).
+    """
+    def _alarm_handler(signum, frame):
+        raise TimeoutError("Gemini hard timeout")
 
-    all_predictions = resp.json().get("predictions", [])
-    best_conf = 0
-    best_class = ""
-    vehicle_preds = []
-    for p in all_predictions:
-        if p["class"] in VEHICLE_CLASSES:
-            vehicle_preds.append(p)
-            if p["confidence"] > best_conf:
-                best_conf = p["confidence"]
-                best_class = p["class"]
-
-    return best_conf > 0, best_conf, best_class, vehicle_preds
-
-
-def stage2_gemini(image_path):
-    """Gemini Flash: confirm UPS/FedEx. Returns True/False."""
     with open(image_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
 
-    for attempt in range(3):
-        try:
-            resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": "Bearer " + OPENROUTER_API_KEY,
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": OPENROUTER_MODEL,
-                    "max_tokens": 20,
-                    "messages": [{
-                        "role": "user",
-                        "content": [
-                            {"type": "image_url", "image_url": {
-                                "url": "data:image/jpeg;base64," + b64}},
-                            {"type": "text", "text": (
-                                "Is there a UPS or FedEx delivery truck clearly "
-                                "visible in this image? ONLY say YES for vehicles "
-                                "with UPS or FedEx branding. Say NO for all other "
-                                "vehicles including Amazon, USPS, unmarked vans, "
-                                "and anything else. Reply YES or NO only."
-                            )},
-                        ],
-                    }],
-                },
-                timeout=30,
-            )
-            resp.raise_for_status()
-            answer = (resp.json()["choices"][0]["message"].get("content") or "").strip().upper()
-            is_delivery = "YES" in answer
-            log.info("Gemini: %s -> %s", answer, "DELIVERY" if is_delivery else "NOT DELIVERY")
-            return is_delivery
-        except Exception as e:
-            if attempt < 2:
-                log.warning("Gemini attempt %d failed: %s", attempt + 1, e)
-                time.sleep(1)
-            else:
-                log.error("Gemini failed after 3 attempts — skipping notification")
-                return False
+    signal.signal(signal.SIGALRM, _alarm_handler)
+    signal.alarm(alarm_s)
+    try:
+        for attempt in range(3):
+            try:
+                resp = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": "Bearer " + OPENROUTER_API_KEY,
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": OPENROUTER_MODEL,
+                        "max_tokens": 20,
+                        "messages": [{
+                            "role": "user",
+                            "content": [
+                                {"type": "image_url", "image_url": {
+                                    "url": "data:image/jpeg;base64," + b64}},
+                                {"type": "text", "text": (
+                                    "Is there a UPS or FedEx delivery truck clearly "
+                                    "visible in this image? ONLY say YES for vehicles "
+                                    "with UPS or FedEx branding. Say NO for all other "
+                                    "vehicles including Amazon, USPS, unmarked vans, "
+                                    "and anything else. Reply YES or NO only."
+                                )},
+                            ],
+                        }],
+                    },
+                    timeout=(10, 20),  # (connect, read) — separate timeouts
+                )
+                resp.raise_for_status()
+                answer = (resp.json()["choices"][0]["message"].get("content") or "").strip().upper()
+                is_delivery = "YES" in answer
+                log.info("Gemini: %s -> %s", answer, "DELIVERY" if is_delivery else "NOT DELIVERY")
+                ping_healthcheck()  # successful Gemini call = pipeline healthy
+                return is_delivery
+            except TimeoutError:
+                raise  # let SIGALRM bubble up to outer handler
+            except Exception as e:
+                if attempt < 2:
+                    log.warning("Gemini attempt %d failed: %s", attempt + 1, e)
+                    time.sleep(1)
+                else:
+                    log.error("Gemini failed after 3 attempts — skipping notification")
+                    return False
+    except TimeoutError:
+        log.error("Gemini hard timeout (%ds) — skipping frame", alarm_s)
+        return False
+    finally:
+        signal.alarm(0)  # always cancel the alarm
 
 
-def save_detection(image_path, cls, conf, vehicle_preds, gemini_verdict):
-    """Save stage 1 hit to rolling log directory."""
+_last_no_save = 0
+
+def save_detection(image_path, gemini_verdict, suffix=""):
+    """Save YES frames always; NO frames only every NO_SAMPLE_INTERVAL seconds
+    to reduce SD card wear. Suffixed frames (tentative/confirm) always save —
+    they're tied to a detection event, not the rolling background sample.
+    Returns True if saved, False if skipped."""
+    global _last_no_save
+    now = time.time()
+    if not suffix and not gemini_verdict and (now - _last_no_save) < NO_SAMPLE_INTERVAL:
+        return False  # skip — recent NO already sampled
+
     os.makedirs(LOG_DIR, exist_ok=True)
     ts = time.strftime("%Y%m%d_%H%M%S")
     verdict = "YES" if gemini_verdict else "NO"
-    fname = f"{verdict}_{cls}_{conf:.2f}_{ts}"
-    shutil.copy(image_path, os.path.join(LOG_DIR, fname + ".jpg"))
-    with open(os.path.join(LOG_DIR, fname + ".json"), "w") as jf:
-        json.dump({
-            "timestamp": ts,
-            "roboflow_class": cls,
-            "roboflow_conf": round(conf, 3),
-            "gemini_verdict": verdict,
-            "vehicle_boxes": vehicle_preds,
-        }, jf, indent=2)
+    shutil.copy(image_path, os.path.join(LOG_DIR, f"{verdict}_{ts}{suffix}.jpg"))
+    if not suffix and not gemini_verdict:
+        _last_no_save = now
+    return True
+
+
+_last_hc_ping = 0
+
+def ping_healthcheck(force=False):
+    """Fire-and-forget ping to healthchecks.io. Rate-limited to HC_INTERVAL
+    unless force=True. Failure is non-fatal."""
+    global _last_hc_ping
+    now = time.time()
+    if not force and (now - _last_hc_ping) < HC_INTERVAL:
+        return
+    try:
+        requests.get(HC_PING_URL, timeout=5)
+        _last_hc_ping = now
+        log.info("Healthcheck ping sent")
+    except Exception as e:
+        log.warning("Healthcheck ping failed: %s", e)
 
 
 def cleanup_old_detections():
@@ -217,8 +226,8 @@ def in_active_hours():
 
 
 def main():
-    if not ROBOFLOW_API_KEY:
-        print("ERROR: ROBOFLOW_API_KEY not set")
+    if not OPENROUTER_API_KEY:
+        print("ERROR: OPENROUTER_API_KEY not set")
         sys.exit(1)
 
     rtsp_url = "rtsp://{}:{}@{}:554/{}".format(CAMERA_USER, CAMERA_PASS, CAMERA_IP, STREAM)
@@ -239,59 +248,64 @@ def main():
                 sys.exit(1)
 
     log.info("Detector starting (every %ds, active %d:00-%d:00)", INTERVAL, START_HOUR, END_HOUR)
-    log.info("Stage 1: Roboflow %s | Stage 2: Gemini Flash", ROBOFLOW_MODEL)
+    log.info("Single-stage: Gemini Flash direct (every %ds)", INTERVAL)
     log.info("Detection log: %s (%dh retention)", LOG_DIR, LOG_RETENTION_HOURS)
 
     global clear_streak, last_notification_time
 
     frame_count = 0
     last_cleanup = 0
+    ping_healthcheck(force=True)  # always ping on startup so we know Pi came back up
     while True:
         try:
             if not in_active_hours():
                 if frame_count > 0:
                     log.info("Outside active hours — sleeping")
                     frame_count = 0
+                ping_healthcheck()  # overnight keepalive (rate-limited to HC_INTERVAL)
                 time.sleep(60)
                 continue
 
             grab_frame(rtsp_url, tmp_path)
 
-            # Stage 1: Roboflow YOLO (free)
-            detected, conf, cls, vehicle_preds = stage1_roboflow(tmp_path)
+            # Single-stage: Gemini Flash directly
             frame_count += 1
+            now = time.time()
 
-            if not detected:
+            # Skip Gemini if cooldown active (same truck still there)
+            if now - last_notification_time < COOLDOWN:
+                time.sleep(INTERVAL)
+                continue
+
+            is_delivery = call_gemini(tmp_path)
+
+            if is_delivery:
+                # Tentative — could be a truck driving past on the cross-street.
+                # Wait 5s and recheck: a real delivery is still parked, a
+                # drive-by is long gone.
+                save_detection(tmp_path, True, suffix="_tentative")
+                log.info("Tentative YES — confirming in 5s...")
+                time.sleep(5)
+                try:
+                    grab_frame(rtsp_url, tmp_path)
+                    confirmed = call_gemini(tmp_path, alarm_s=15)
+                    save_detection(tmp_path, confirmed, suffix="_confirm")
+                    if confirmed:
+                        clear_streak = 0
+                        log.info(">>> DELIVERY TRUCK CONFIRMED (2/2)!")
+                        send_notification(tmp_path)
+                    else:
+                        log.info("Drive-by dismissed — truck gone after 5s")
+                except Exception as e:
+                    log.warning("Confirm step failed: %s — skipping notification", e)
+            else:
+                save_detection(tmp_path, False)
                 clear_streak += 1
                 if clear_streak == CLEAR_STREAK_RESET and last_notification_time > 0:
                     log.info("Scene clear for %d checks — cooldown reset", CLEAR_STREAK_RESET)
                     last_notification_time = 0
                 if frame_count % 10 == 0:
                     log.info("Monitoring... (%d checks, all clear)", frame_count)
-                time.sleep(INTERVAL)
-                continue
-
-            clear_streak = 0  # vehicle present, reset clear streak
-
-            # Skip stage 2 if cooldown is active (same truck still there)
-            now = time.time()
-            if now - last_notification_time < COOLDOWN:
-                time.sleep(INTERVAL)
-                continue
-
-            log.info("Stage 1: %s detected (conf=%.2f) — checking with Gemini...", cls, conf)
-
-            # Stage 2: Gemini confirmation (costs ~$0.0006)
-            is_delivery = stage2_gemini(tmp_path)
-
-            # Save every stage 1 hit with Gemini verdict
-            save_detection(tmp_path, cls, conf, vehicle_preds, is_delivery)
-
-            if is_delivery:
-                log.info(">>> DELIVERY TRUCK CONFIRMED!")
-                send_notification(tmp_path)
-            else:
-                log.info("Gemini says not a delivery truck — skipping")
 
             # Cleanup old files once per hour
             if now - last_cleanup > 3600:
