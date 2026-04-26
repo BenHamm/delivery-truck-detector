@@ -33,8 +33,16 @@ STREAM = os.environ.get("STREAM", "stream1")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-3-flash-preview")
 
-# Pushover
+# Pushover — two recipient tiers
+# PUSHOVER_USER_KEY: the "premium" tier (UPS + FedEx only). Greg's account, or
+#   eventually a Delivery Group of users who don't want Amazon/USPS spam.
+# PUSHOVER_KEY_ALL: the "all-carriers" tier (UPS, FedEx, Amazon, USPS). A
+#   Delivery Group key for neighbors who want everything. Leave empty to disable.
+# Both accept user keys or group keys interchangeably (Pushover's API doesn't
+# distinguish). UPS/FEDEX events fan out to BOTH keys; AMAZON/USPS events go
+# to the "all" key only.
 PUSHOVER_USER_KEY = os.environ.get("PUSHOVER_USER_KEY", "")
+PUSHOVER_KEY_ALL = os.environ.get("PUSHOVER_KEY_ALL", "")
 PUSHOVER_APP_TOKEN = os.environ.get("PUSHOVER_APP_TOKEN", "")
 
 # Timing
@@ -52,6 +60,19 @@ NO_SAMPLE_INTERVAL = int(os.environ.get("NO_SAMPLE_INTERVAL", "1800"))  # save 1
 HC_PING_URL = os.environ.get("HC_PING_URL", "https://hc-ping.com/1d4cb30e-1d3e-4425-b6d9-f1f93590ca4c")
 HC_INTERVAL = 1800  # ping every 30 minutes
 
+# Carrier classification
+TRACKED_CARRIERS = {"UPS", "FEDEX", "AMAZON", "USPS"}
+PREMIUM_CARRIERS = {"UPS", "FEDEX"}  # also delivered to PUSHOVER_USER_KEY tier
+NON_TRACKED = {"NONE", "OTHER"}      # no notification; rate-limited disk save
+ALL_VERDICTS = TRACKED_CARRIERS | NON_TRACKED
+
+CARRIER_MESSAGES = {
+    "UPS":    "UPS truck spotted! Go grab your package!",
+    "FEDEX":  "FedEx truck spotted! Go grab your package!",
+    "AMAZON": "Amazon van spotted! Go grab your package!",
+    "USPS":   "USPS truck spotted! Mail or package incoming.",
+}
+
 last_notification_time = 0
 clear_streak = 0
 CLEAR_STREAK_RESET = 3
@@ -67,8 +88,22 @@ def grab_frame(rtsp_url, output_path):
         raise RuntimeError("ffmpeg: " + result.stderr.decode().strip())
 
 
+CARRIER_PROMPT = (
+    "Look at this image. Identify the most prominent delivery vehicle, if any. "
+    "Reply with ONE word from this list:\n"
+    "- UPS (brown truck/van with UPS branding)\n"
+    "- FEDEX (white truck/van with FedEx branding, purple/orange wordmark)\n"
+    "- AMAZON (dark blue Sprinter or ProMaster van with Amazon smile or Prime logo)\n"
+    "- USPS (white postal truck with USPS branding)\n"
+    "- OTHER (delivery-purpose truck/van without identifiable carrier)\n"
+    "- NONE (no delivery vehicle; parked passenger cars do not count)\n"
+    "Reply with ONLY one word from the list."
+)
+
+
 def call_gemini(image_path, alarm_s=25):
-    """Gemini Flash: confirm UPS/FedEx. Returns True/False.
+    """Gemini Flash: classify carrier. Returns one of:
+    UPS, FEDEX, AMAZON, USPS, OTHER, NONE (or NONE on error/parse failure).
 
     Hard SIGALRM backstop prevents a stalled HTTP call from blocking
     long enough to trigger the systemd watchdog (1 min). alarm_s=25 for
@@ -100,24 +135,19 @@ def call_gemini(image_path, alarm_s=25):
                             "content": [
                                 {"type": "image_url", "image_url": {
                                     "url": "data:image/jpeg;base64," + b64}},
-                                {"type": "text", "text": (
-                                    "Is there a UPS or FedEx delivery truck clearly "
-                                    "visible in this image? ONLY say YES for vehicles "
-                                    "with UPS or FedEx branding. Say NO for all other "
-                                    "vehicles including Amazon, USPS, unmarked vans, "
-                                    "and anything else. Reply YES or NO only."
-                                )},
+                                {"type": "text", "text": CARRIER_PROMPT},
                             ],
                         }],
                     },
                     timeout=(10, 20),  # (connect, read) — separate timeouts
                 )
                 resp.raise_for_status()
-                answer = (resp.json()["choices"][0]["message"].get("content") or "").strip().upper()
-                is_delivery = "YES" in answer
-                log.info("Gemini: %s -> %s", answer, "DELIVERY" if is_delivery else "NOT DELIVERY")
+                raw = (resp.json()["choices"][0]["message"].get("content") or "").strip().upper()
+                # Pick the first matching label that appears in the response.
+                carrier = next((v for v in ALL_VERDICTS if v in raw), "NONE")
+                log.info("Gemini: %r -> %s", raw[:40], carrier)
                 ping_healthcheck()  # successful Gemini call = pipeline healthy
-                return is_delivery
+                return carrier
             except TimeoutError:
                 raise  # let SIGALRM bubble up to outer handler
             except Exception as e:
@@ -125,32 +155,33 @@ def call_gemini(image_path, alarm_s=25):
                     log.warning("Gemini attempt %d failed: %s", attempt + 1, e)
                     time.sleep(1)
                 else:
-                    log.error("Gemini failed after 3 attempts — skipping notification")
-                    return False
+                    log.error("Gemini failed after 3 attempts — treating as NONE")
+                    return "NONE"
     except TimeoutError:
-        log.error("Gemini hard timeout (%ds) — skipping frame", alarm_s)
-        return False
+        log.error("Gemini hard timeout (%ds) — treating as NONE", alarm_s)
+        return "NONE"
     finally:
         signal.alarm(0)  # always cancel the alarm
 
 
 _last_no_save = 0
 
-def save_detection(image_path, gemini_verdict, suffix=""):
-    """Save YES frames always; NO frames only every NO_SAMPLE_INTERVAL seconds
-    to reduce SD card wear. Suffixed frames (tentative/confirm) always save —
-    they're tied to a detection event, not the rolling background sample.
+def save_detection(image_path, carrier, suffix=""):
+    """Save tracked-carrier frames always (UPS, FEDEX, AMAZON, USPS); rate-limit
+    NONE/OTHER background frames to NO_SAMPLE_INTERVAL to reduce SD card wear.
+    Suffixed frames (tentative/confirm) always save — they're tied to a
+    detection event, not the rolling background sample. Filename format:
+    <CARRIER>_<ts>[_suffix].jpg
     Returns True if saved, False if skipped."""
     global _last_no_save
     now = time.time()
-    if not suffix and not gemini_verdict and (now - _last_no_save) < NO_SAMPLE_INTERVAL:
-        return False  # skip — recent NO already sampled
+    if not suffix and carrier in NON_TRACKED and (now - _last_no_save) < NO_SAMPLE_INTERVAL:
+        return False  # rate-limited background sample
 
     os.makedirs(LOG_DIR, exist_ok=True)
     ts = time.strftime("%Y%m%d_%H%M%S")
-    verdict = "YES" if gemini_verdict else "NO"
-    shutil.copy(image_path, os.path.join(LOG_DIR, f"{verdict}_{ts}{suffix}.jpg"))
-    if not suffix and not gemini_verdict:
+    shutil.copy(image_path, os.path.join(LOG_DIR, f"{carrier}_{ts}{suffix}.jpg"))
+    if not suffix and carrier in NON_TRACKED:
         _last_no_save = now
     return True
 
@@ -187,38 +218,65 @@ def cleanup_old_detections():
         log.info("Cleaned up %d old detection files", removed)
 
 
-def send_notification(image_path):
+def send_notification(image_path, carrier):
+    """Route notifications by carrier:
+      - UPS, FEDEX  → premium tier (PUSHOVER_USER_KEY) + all tier (PUSHOVER_KEY_ALL)
+      - AMAZON, USPS → all tier only
+      - other carriers → no notification
+
+    Cooldown applies globally (one notification per COOLDOWN window regardless
+    of carrier — we don't want a UPS+Amazon back-to-back to ping twice).
+    """
     global last_notification_time
+
+    if not PUSHOVER_APP_TOKEN:
+        log.warning("Pushover not configured (no app token)")
+        return False
 
     now = time.time()
     if now - last_notification_time < COOLDOWN:
         log.info("Cooldown active (%ds left)", int(COOLDOWN - (now - last_notification_time)))
         return False
 
-    if not PUSHOVER_USER_KEY or not PUSHOVER_APP_TOKEN:
-        log.warning("Pushover not configured")
+    targets = []
+    if carrier in PREMIUM_CARRIERS and PUSHOVER_USER_KEY:
+        targets.append(("premium", PUSHOVER_USER_KEY))
+    if carrier in TRACKED_CARRIERS and PUSHOVER_KEY_ALL:
+        targets.append(("all", PUSHOVER_KEY_ALL))
+
+    if not targets:
+        log.info("No Pushover targets for carrier=%s — skipping notification", carrier)
         return False
 
-    with open(image_path, "rb") as f:
-        resp = requests.post(
-            "https://api.pushover.net/1/messages.json",
-            data={
-                "token": PUSHOVER_APP_TOKEN,
-                "user": PUSHOVER_USER_KEY,
-                "message": "UPS or FedEx truck spotted! Go grab your package!",
-                "title": "Delivery Truck Alert",
-                "priority": 1,
-                "sound": "siren",
-            },
-            files={"attachment": ("truck.jpg", f, "image/jpeg")},
-            timeout=10,
-        )
-    if resp.status_code != 200:
-        log.error("Pushover returned %d: %s", resp.status_code, resp.text[:200])
-        return False
-    last_notification_time = now
-    log.info("Notification sent!")
-    return True
+    message = CARRIER_MESSAGES.get(carrier, f"{carrier} delivery vehicle spotted!")
+    sent_any = False
+    for tier_name, key in targets:
+        try:
+            with open(image_path, "rb") as f:
+                resp = requests.post(
+                    "https://api.pushover.net/1/messages.json",
+                    data={
+                        "token": PUSHOVER_APP_TOKEN,
+                        "user": key,
+                        "message": message,
+                        "title": "Delivery Truck Alert",
+                        "priority": 1,
+                        "sound": "siren",
+                    },
+                    files={"attachment": ("truck.jpg", f, "image/jpeg")},
+                    timeout=10,
+                )
+            if resp.status_code != 200:
+                log.error("Pushover %s tier returned %d: %s", tier_name, resp.status_code, resp.text[:200])
+            else:
+                log.info("Notification sent to %s tier (%s)", tier_name, carrier)
+                sent_any = True
+        except Exception as e:
+            log.error("Pushover %s tier failed: %s", tier_name, e)
+
+    if sent_any:
+        last_notification_time = now
+    return sent_any
 
 
 def in_active_hours():
@@ -248,7 +306,9 @@ def main():
                 sys.exit(1)
 
     log.info("Detector starting (every %ds, active %d:00-%d:00)", INTERVAL, START_HOUR, END_HOUR)
-    log.info("Single-stage: Gemini Flash direct (every %ds)", INTERVAL)
+    log.info("Multi-carrier classifier: %s + OTHER + NONE", ", ".join(sorted(TRACKED_CARRIERS)))
+    log.info("Notifies premium tier (%s) for: %s", "set" if PUSHOVER_USER_KEY else "EMPTY", ", ".join(sorted(PREMIUM_CARRIERS)))
+    log.info("Notifies all tier (%s) for: %s", "set" if PUSHOVER_KEY_ALL else "EMPTY", ", ".join(sorted(TRACKED_CARRIERS)))
     log.info("Detection log: %s (%dh retention)", LOG_DIR, LOG_RETENTION_HOURS)
 
     global clear_streak, last_notification_time
@@ -277,29 +337,32 @@ def main():
                 time.sleep(INTERVAL)
                 continue
 
-            is_delivery = call_gemini(tmp_path)
+            tentative_carrier = call_gemini(tmp_path)
 
-            if is_delivery:
+            if tentative_carrier in TRACKED_CARRIERS:
                 # Tentative — could be a truck driving past on the cross-street.
                 # Wait 5s and recheck: a real delivery is still parked, a
                 # drive-by is long gone.
-                save_detection(tmp_path, True, suffix="_tentative")
-                log.info("Tentative YES — confirming in 5s...")
+                save_detection(tmp_path, tentative_carrier, suffix="_tentative")
+                log.info("Tentative %s — confirming in 5s...", tentative_carrier)
                 time.sleep(5)
                 try:
                     grab_frame(rtsp_url, tmp_path)
-                    confirmed = call_gemini(tmp_path, alarm_s=15)
-                    save_detection(tmp_path, confirmed, suffix="_confirm")
-                    if confirmed:
+                    confirm_carrier = call_gemini(tmp_path, alarm_s=15)
+                    save_detection(tmp_path, confirm_carrier, suffix="_confirm")
+                    if confirm_carrier in TRACKED_CARRIERS:
                         clear_streak = 0
-                        log.info(">>> DELIVERY TRUCK CONFIRMED (2/2)!")
-                        send_notification(tmp_path)
+                        log.info(">>> DELIVERY CONFIRMED (2/2): tentative=%s confirm=%s",
+                                 tentative_carrier, confirm_carrier)
+                        send_notification(tmp_path, confirm_carrier)
                     else:
-                        log.info("Drive-by dismissed — truck gone after 5s")
+                        log.info("Drive-by dismissed — was %s, now %s after 5s",
+                                 tentative_carrier, confirm_carrier)
                 except Exception as e:
                     log.warning("Confirm step failed: %s — skipping notification", e)
             else:
-                save_detection(tmp_path, False)
+                # NONE or OTHER — background sample (rate-limited inside save)
+                save_detection(tmp_path, tentative_carrier)
                 clear_streak += 1
                 if clear_streak == CLEAR_STREAK_RESET and last_notification_time > 0:
                     log.info("Scene clear for %d checks — cooldown reset", CLEAR_STREAK_RESET)

@@ -10,9 +10,12 @@ Detect UPS/FedEx trucks parked on the street via IP camera and get push notifica
 
 1. **Tapo IP camera** captures video, pointed at the street
 2. **Pi Zero 2 W** grabs one JPEG every 30s via ffmpeg/RTSP
-3. **Gemini Flash** (via OpenRouter) classifies the image: UPS/FedEx truck or not
-4. On a YES, the Pi waits 5s and re-checks — drive-bys vanish, parked trucks persist
-5. **Pushover** sends a push notification with the snapshot
+3. **Gemini Flash** (via OpenRouter) classifies the image into one of: `UPS`, `FEDEX`, `AMAZON`, `USPS`, `OTHER`, or `NONE`
+4. On a tracked carrier (`UPS`/`FEDEX`/`AMAZON`/`USPS`), the Pi waits 5s and re-checks — drive-bys vanish, parked trucks persist
+5. **Pushover** sends a push notification, routed by carrier:
+   - `UPS` / `FEDEX` → premium tier (`PUSHOVER_USER_KEY`) **and** all-carriers tier
+   - `AMAZON` / `USPS` → all-carriers tier only (`PUSHOVER_KEY_ALL`)
+   - The premium tier exists for users who don't want Amazon/USPS spam
 
 A **healthchecks.io** dead-man's switch fires a Pushover alert if the Pi goes silent for >30 minutes.
 
