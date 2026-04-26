@@ -88,6 +88,20 @@ def grab_frame(rtsp_url, output_path):
         raise RuntimeError("ffmpeg: " + result.stderr.decode().strip())
 
 
+# Stage 1: cheap, calibrated binary gate. The multi-carrier prompt below
+# hallucinates a carrier ~40% of the time on glare/noise scenes (Apr 26 incident);
+# this binary form held 0% on the same frame across 40 trials. We only invoke
+# the carrier classifier *after* two binary YES in a row.
+BINARY_PROMPT = (
+    "Is there a UPS, FedEx, Amazon, or USPS delivery vehicle clearly "
+    "visible in this image? ONLY say YES if you can clearly see one of "
+    "these carriers' branding (UPS shield, FedEx wordmark, Amazon smile, "
+    "or USPS markings). Say NO for unmarked vans, passenger cars, SUVs, "
+    "and anything else. Reply YES or NO only."
+)
+
+# Stage 2: only invoked after 2/2 binary confirm. Routes a confirmed delivery
+# to the right notification tier.
 CARRIER_PROMPT = (
     "Look at this image. Identify the most prominent delivery vehicle, if any. "
     "Reply with ONE word from this list:\n"
@@ -101,14 +115,14 @@ CARRIER_PROMPT = (
 )
 
 
-def call_gemini(image_path, alarm_s=25):
-    """Gemini Flash: classify carrier. Returns one of:
-    UPS, FEDEX, AMAZON, USPS, OTHER, NONE (or NONE on error/parse failure).
+def _gemini_call(image_path, prompt, alarm_s=25):
+    """Shared HTTP path for Gemini classification. Returns the raw upper-cased
+    response, or None on failure (timeout / 3 retries exhausted).
 
-    Hard SIGALRM backstop prevents a stalled HTTP call from blocking
-    long enough to trigger the systemd watchdog (1 min). alarm_s=25 for
-    primary polls, alarm_s=15 for confirm polls (where worst-case must
-    stack under 60s: 25 + 5 sleep + 15 = 45s).
+    Hard SIGALRM backstop prevents a stalled HTTP call from blocking long
+    enough to trigger the systemd watchdog (1 min). alarm_s=25 for primary
+    polls, alarm_s=15 for confirm polls (worst-case must stack under 60s:
+    25 binary + 5 sleep + 15 binary-confirm + 15 carrier = 60s).
     """
     def _alarm_handler(signum, frame):
         raise TimeoutError("Gemini hard timeout")
@@ -135,33 +149,52 @@ def call_gemini(image_path, alarm_s=25):
                             "content": [
                                 {"type": "image_url", "image_url": {
                                     "url": "data:image/jpeg;base64," + b64}},
-                                {"type": "text", "text": CARRIER_PROMPT},
+                                {"type": "text", "text": prompt},
                             ],
                         }],
                     },
-                    timeout=(10, 20),  # (connect, read) — separate timeouts
+                    timeout=(10, 20),
                 )
                 resp.raise_for_status()
-                raw = (resp.json()["choices"][0]["message"].get("content") or "").strip().upper()
-                # Pick the first matching label that appears in the response.
-                carrier = next((v for v in ALL_VERDICTS if v in raw), "NONE")
-                log.info("Gemini: %r -> %s", raw[:40], carrier)
-                ping_healthcheck()  # successful Gemini call = pipeline healthy
-                return carrier
+                return (resp.json()["choices"][0]["message"].get("content") or "").strip().upper()
             except TimeoutError:
-                raise  # let SIGALRM bubble up to outer handler
+                raise
             except Exception as e:
                 if attempt < 2:
                     log.warning("Gemini attempt %d failed: %s", attempt + 1, e)
                     time.sleep(1)
                 else:
-                    log.error("Gemini failed after 3 attempts — treating as NONE")
-                    return "NONE"
+                    log.error("Gemini failed after 3 attempts")
+                    return None
     except TimeoutError:
-        log.error("Gemini hard timeout (%ds) — treating as NONE", alarm_s)
-        return "NONE"
+        log.error("Gemini hard timeout (%ds)", alarm_s)
+        return None
     finally:
-        signal.alarm(0)  # always cancel the alarm
+        signal.alarm(0)
+
+
+def is_delivery_truck(image_path, alarm_s=25):
+    """Stage 1 binary gate. True iff Gemini sees a tracked-carrier delivery
+    vehicle. Failures (timeout, network) return False — the systemd watchdog
+    and healthcheck will catch sustained outages."""
+    raw = _gemini_call(image_path, BINARY_PROMPT, alarm_s)
+    if raw is None:
+        return False
+    is_yes = "YES" in raw
+    log.info("Gate: %r -> %s", raw[:30], "YES" if is_yes else "NO")
+    ping_healthcheck()  # successful call = pipeline healthy
+    return is_yes
+
+
+def classify_carrier(image_path, alarm_s=15):
+    """Stage 2 carrier classifier — only invoked after 2/2 binary YES.
+    Returns one of UPS/FEDEX/AMAZON/USPS/OTHER/NONE. NONE on failure."""
+    raw = _gemini_call(image_path, CARRIER_PROMPT, alarm_s)
+    if raw is None:
+        return "NONE"
+    carrier = next((v for v in ALL_VERDICTS if v in raw), "NONE")
+    log.info("Carrier: %r -> %s", raw[:30], carrier)
+    return carrier
 
 
 _last_no_save = 0
@@ -306,7 +339,8 @@ def main():
                 sys.exit(1)
 
     log.info("Detector starting (every %ds, active %d:00-%d:00)", INTERVAL, START_HOUR, END_HOUR)
-    log.info("Multi-carrier classifier: %s + OTHER + NONE", ", ".join(sorted(TRACKED_CARRIERS)))
+    log.info("Two-stage: binary gate (%s) -> carrier classifier on 2/2 confirm",
+             "+".join(sorted(TRACKED_CARRIERS)))
     log.info("Notifies premium tier (%s) for: %s", "set" if PUSHOVER_USER_KEY else "EMPTY", ", ".join(sorted(PREMIUM_CARRIERS)))
     log.info("Notifies all tier (%s) for: %s", "set" if PUSHOVER_KEY_ALL else "EMPTY", ", ".join(sorted(TRACKED_CARRIERS)))
     log.info("Detection log: %s (%dh retention)", LOG_DIR, LOG_RETENTION_HOURS)
@@ -337,32 +371,40 @@ def main():
                 time.sleep(INTERVAL)
                 continue
 
-            tentative_carrier = call_gemini(tmp_path)
+            # Stage 1: cheap, calibrated binary gate.
+            tentative_yes = is_delivery_truck(tmp_path)
 
-            if tentative_carrier in TRACKED_CARRIERS:
-                # Tentative — could be a truck driving past on the cross-street.
-                # Wait 5s and recheck: a real delivery is still parked, a
-                # drive-by is long gone.
-                save_detection(tmp_path, tentative_carrier, suffix="_tentative")
-                log.info("Tentative %s — confirming in 5s...", tentative_carrier)
+            if tentative_yes:
+                # Tentative YES — could be a truck driving past on the
+                # cross-street. Wait 5s and re-check: a real delivery is still
+                # parked, a drive-by is long gone.
+                save_detection(tmp_path, "YES", suffix="_tentative")
+                log.info("Tentative YES — confirming in 5s...")
                 time.sleep(5)
                 try:
                     grab_frame(rtsp_url, tmp_path)
-                    confirm_carrier = call_gemini(tmp_path, alarm_s=15)
-                    save_detection(tmp_path, confirm_carrier, suffix="_confirm")
-                    if confirm_carrier in TRACKED_CARRIERS:
-                        clear_streak = 0
-                        log.info(">>> DELIVERY CONFIRMED (2/2): tentative=%s confirm=%s",
-                                 tentative_carrier, confirm_carrier)
-                        send_notification(tmp_path, confirm_carrier)
+                    confirm_yes = is_delivery_truck(tmp_path, alarm_s=15)
+                    if confirm_yes:
+                        # 2/2 binary YES — only now do we burn the carrier
+                        # classifier call to route to the right tier.
+                        carrier = classify_carrier(tmp_path, alarm_s=15)
+                        save_detection(tmp_path, carrier, suffix="_confirm")
+                        if carrier in TRACKED_CARRIERS:
+                            clear_streak = 0
+                            log.info(">>> DELIVERY CONFIRMED (2/2 binary), carrier=%s", carrier)
+                            send_notification(tmp_path, carrier)
+                        else:
+                            # Binary said YES twice but classifier disagreed —
+                            # ambiguous, skip to avoid wrong-carrier ping.
+                            log.info("2/2 binary YES but carrier=%s — skipping notification", carrier)
                     else:
-                        log.info("Drive-by dismissed — was %s, now %s after 5s",
-                                 tentative_carrier, confirm_carrier)
+                        save_detection(tmp_path, "NO", suffix="_confirm")
+                        log.info("Drive-by dismissed — YES then NO after 5s")
                 except Exception as e:
                     log.warning("Confirm step failed: %s — skipping notification", e)
             else:
-                # NONE or OTHER — background sample (rate-limited inside save)
-                save_detection(tmp_path, tentative_carrier)
+                # Background sample, rate-limited inside save_detection.
+                save_detection(tmp_path, "NONE")
                 clear_streak += 1
                 if clear_streak == CLEAR_STREAK_RESET and last_notification_time > 0:
                     log.info("Scene clear for %d checks — cooldown reset", CLEAR_STREAK_RESET)
