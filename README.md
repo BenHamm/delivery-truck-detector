@@ -11,7 +11,7 @@ Detect UPS/FedEx trucks parked on the street via IP camera and get push notifica
 1. **Tapo IP camera** captures video, pointed at the street
 2. **Pi Zero 2 W** grabs one JPEG every 30s via ffmpeg/RTSP
 3. **Gemini Flash** (via OpenRouter) runs a cheap binary "is this a UPS/FedEx/Amazon delivery vehicle?" gate on every poll
-4. On binary YES, the Pi waits 5s and re-runs the gate — drive-bys vanish, parked trucks persist. Only after 2/2 binary YES does it spend the more expensive carrier-classification call (`UPS`/`FEDEX`/`AMAZON`/`USPS`/`OTHER`/`NONE`) for routing.
+4. On binary YES, the Pi waits 5s, grabs a fresh frame, and runs the multi-carrier classifier (`UPS`/`FEDEX`/`AMAZON`/`USPS`/`OTHER`/`NONE`). A real parked delivery still classifies as its carrier; a drive-by classifies as `NONE` because the truck has moved out of frame. The carrier verdict doubles as the routing key.
 5. **Pushover** sends a push notification, routed by carrier:
    - `UPS` / `FEDEX` → premium tier (`PUSHOVER_USER_KEY`) **and** all-carriers tier
    - `AMAZON` → all-carriers tier only (`PUSHOVER_KEY_ALL`)
@@ -43,7 +43,7 @@ journalctl -u detector -f
 
 - Active hours default 8:00–20:00 (configurable via `START_HOUR`/`END_HOUR`)
 - Post-notification cooldown (default 10 min) prevents spam from the same parked truck
-- Frames saved to `/home/pi/detections/` with 36h retention. YES frames always saved (with `_tentative` and `_confirm` suffixes for the 2-stage pair); NO frames sampled every 30 min for SD card health
+- Frames saved to `/home/pi/detections/` with 36h retention. Tentative-YES frames always saved (`YES_*_tentative.jpg`); confirm frames saved with their carrier verdict (`<CARRIER>_*_confirm.jpg`); background NO frames sampled every 2 min so we have context to debug false negatives
 - Hard 25s SIGALRM backstop on every Gemini call — a stalled HTTP request can't block the loop indefinitely
 
 ## History

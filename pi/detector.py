@@ -94,8 +94,9 @@ def grab_frame(rtsp_url, output_path):
 
 # Stage 1: cheap, calibrated binary gate. The multi-carrier prompt below
 # hallucinates a carrier ~40% of the time on glare/noise scenes (Apr 26 incident);
-# this binary form held 0% on the same frame across 40 trials. We only invoke
-# the carrier classifier *after* two binary YES in a row.
+# this binary form held 0% on the same frame across 40 trials. The carrier
+# classifier is only invoked on a fresh frame +5s after a tentative binary YES,
+# and acts as both the confirmation gate (drive-by filter) and the routing key.
 BINARY_PROMPT = (
     "Is there a UPS, FedEx, or Amazon delivery vehicle clearly "
     "visible in this image? ONLY say YES if you can clearly see one of "
@@ -104,8 +105,9 @@ BINARY_PROMPT = (
     "cars, SUVs, and anything else. Reply YES or NO only."
 )
 
-# Stage 2: only invoked after 2/2 binary confirm. Routes a confirmed delivery
-# to the right notification tier.
+# Stage 2: invoked on a fresh frame 5s after a tentative binary YES. Doubles
+# as both the drive-by filter (a moving truck is gone -> carrier=NONE) and
+# the routing classifier (carrier in TRACKED -> notify the right tier).
 CARRIER_PROMPT = (
     "Look at this image. Identify the most prominent delivery vehicle, if any. "
     "Reply with ONE word from this list:\n"
@@ -125,8 +127,8 @@ def _gemini_call(image_path, prompt, alarm_s=25):
 
     Hard SIGALRM backstop prevents a stalled HTTP call from blocking long
     enough to trigger the systemd watchdog (1 min). alarm_s=25 for primary
-    polls, alarm_s=15 for confirm polls (worst-case must stack under 60s:
-    25 binary + 5 sleep + 15 binary-confirm + 15 carrier = 60s).
+    binary polls, alarm_s=15 for the carrier confirm (worst-case stack:
+    25 binary + 5 sleep + 15 carrier = 45s).
     """
     def _alarm_handler(signum, frame):
         raise TimeoutError("Gemini hard timeout")
@@ -191,7 +193,8 @@ def is_delivery_truck(image_path, alarm_s=25):
 
 
 def classify_carrier(image_path, alarm_s=15):
-    """Stage 2 carrier classifier — only invoked after 2/2 binary YES.
+    """Stage 2 carrier classifier. Invoked on the +5s frame after a tentative
+    binary YES, doubling as drive-by filter and tier-routing key.
     Returns one of UPS/FEDEX/AMAZON/USPS/OTHER/NONE. NONE on failure."""
     raw = _gemini_call(image_path, CARRIER_PROMPT, alarm_s)
     if raw is None:
@@ -343,7 +346,7 @@ def main():
                 sys.exit(1)
 
     log.info("Detector starting (every %ds, active %d:00-%d:00)", INTERVAL, START_HOUR, END_HOUR)
-    log.info("Two-stage: binary gate (%s) -> carrier classifier on 2/2 confirm",
+    log.info("Two-stage: binary gate (%s) -> carrier classifier on +5s frame",
              "+".join(sorted(TRACKED_CARRIERS)))
     log.info("Notifies premium tier (%s) for: %s", "set" if PUSHOVER_USER_KEY else "EMPTY", ", ".join(sorted(PREMIUM_CARRIERS)))
     log.info("Notifies all tier (%s) for: %s", "set" if PUSHOVER_KEY_ALL else "EMPTY", ", ".join(sorted(TRACKED_CARRIERS)))
@@ -380,30 +383,27 @@ def main():
 
             if tentative_yes:
                 # Tentative YES — could be a truck driving past on the
-                # cross-street. Wait 5s and re-check: a real delivery is still
-                # parked, a drive-by is long gone.
+                # cross-street. Wait 5s, then run the carrier classifier on
+                # a fresh frame: a parked delivery still classifies as its
+                # carrier, a drive-by classifies as NONE (truck moved out
+                # of frame). Earlier design used a binary confirm step, but
+                # binary flickered on borderline real Amazon vans (Apr 27
+                # incident); carrier was rock-solid on the same frames.
+                # Carrier doubles as the routing key.
                 save_detection(tmp_path, "YES", suffix="_tentative")
                 log.info("Tentative YES — confirming in 5s...")
                 time.sleep(5)
                 try:
                     grab_frame(rtsp_url, tmp_path)
-                    confirm_yes = is_delivery_truck(tmp_path, alarm_s=15)
-                    if confirm_yes:
-                        # 2/2 binary YES — only now do we burn the carrier
-                        # classifier call to route to the right tier.
-                        carrier = classify_carrier(tmp_path, alarm_s=15)
-                        save_detection(tmp_path, carrier, suffix="_confirm")
-                        if carrier in TRACKED_CARRIERS:
-                            clear_streak = 0
-                            log.info(">>> DELIVERY CONFIRMED (2/2 binary), carrier=%s", carrier)
-                            send_notification(tmp_path, carrier)
-                        else:
-                            # Binary said YES twice but classifier disagreed —
-                            # ambiguous, skip to avoid wrong-carrier ping.
-                            log.info("2/2 binary YES but carrier=%s — skipping notification", carrier)
+                    carrier = classify_carrier(tmp_path, alarm_s=15)
+                    save_detection(tmp_path, carrier, suffix="_confirm")
+                    if carrier in TRACKED_CARRIERS:
+                        clear_streak = 0
+                        log.info(">>> DELIVERY CONFIRMED, carrier=%s", carrier)
+                        send_notification(tmp_path, carrier)
                     else:
-                        save_detection(tmp_path, "NO", suffix="_confirm")
-                        log.info("Drive-by dismissed — YES then NO after 5s")
+                        # Drive-by, untracked vehicle, or USPS — no notification.
+                        log.info("Confirm carrier=%s — drive-by or untracked, skipping", carrier)
                 except Exception as e:
                     log.warning("Confirm step failed: %s — skipping notification", e)
             else:
