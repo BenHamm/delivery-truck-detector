@@ -35,12 +35,13 @@ OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-3-flash-pre
 
 # Pushover — two recipient tiers
 # PUSHOVER_USER_KEY: the "premium" tier (UPS + FedEx only). Greg's account, or
-#   eventually a Delivery Group of users who don't want Amazon/USPS spam.
-# PUSHOVER_KEY_ALL: the "all-carriers" tier (UPS, FedEx, Amazon, USPS). A
-#   Delivery Group key for neighbors who want everything. Leave empty to disable.
+#   eventually a Delivery Group of users who don't want Amazon spam.
+# PUSHOVER_KEY_ALL: the "all-carriers" tier (UPS, FedEx, Amazon). A Delivery
+#   Group key for neighbors who want everything. Leave empty to disable.
 # Both accept user keys or group keys interchangeably (Pushover's API doesn't
-# distinguish). UPS/FEDEX events fan out to BOTH keys; AMAZON/USPS events go
-# to the "all" key only.
+# distinguish). UPS/FEDEX events fan out to BOTH keys; AMAZON events go to
+# the "all" key only. USPS is excluded entirely — postal carriers have
+# building access, so the alert would be useless.
 PUSHOVER_USER_KEY = os.environ.get("PUSHOVER_USER_KEY", "")
 PUSHOVER_KEY_ALL = os.environ.get("PUSHOVER_KEY_ALL", "")
 PUSHOVER_APP_TOKEN = os.environ.get("PUSHOVER_APP_TOKEN", "")
@@ -54,23 +55,26 @@ END_HOUR = int(os.environ.get("END_HOUR", "20"))
 # Rolling image log
 LOG_DIR = os.environ.get("LOG_DIR", "/home/pi/detections")
 LOG_RETENTION_HOURS = int(os.environ.get("LOG_RETENTION_HOURS", "36"))
-NO_SAMPLE_INTERVAL = int(os.environ.get("NO_SAMPLE_INTERVAL", "1800"))  # save 1 NO frame every 30min
+NO_SAMPLE_INTERVAL = int(os.environ.get("NO_SAMPLE_INTERVAL", "120"))  # save 1 NO frame every 2min — generous sampling for false-negative debugging
 
 # Healthchecks.io dead-man's switch
 HC_PING_URL = os.environ.get("HC_PING_URL", "https://hc-ping.com/1d4cb30e-1d3e-4425-b6d9-f1f93590ca4c")
 HC_INTERVAL = 1800  # ping every 30 minutes
 
 # Carrier classification
-TRACKED_CARRIERS = {"UPS", "FEDEX", "AMAZON", "USPS"}
-PREMIUM_CARRIERS = {"UPS", "FEDEX"}  # also delivered to PUSHOVER_USER_KEY tier
-NON_TRACKED = {"NONE", "OTHER"}      # no notification; rate-limited disk save
+# USPS is intentionally absent from TRACKED_CARRIERS: postal carriers have
+# building access (mail goes directly to the boxes), so a notification would
+# be useless. We still ID USPS in the classifier so we don't *misclassify*
+# it as another carrier and notify wrongly.
+TRACKED_CARRIERS = {"UPS", "FEDEX", "AMAZON"}
+PREMIUM_CARRIERS = {"UPS", "FEDEX"}            # also delivered to PUSHOVER_USER_KEY tier
+NON_TRACKED = {"NONE", "OTHER", "USPS"}        # detected but no notification; rate-limited disk save
 ALL_VERDICTS = TRACKED_CARRIERS | NON_TRACKED
 
 CARRIER_MESSAGES = {
     "UPS":    "UPS truck spotted! Go grab your package!",
     "FEDEX":  "FedEx truck spotted! Go grab your package!",
     "AMAZON": "Amazon van spotted! Go grab your package!",
-    "USPS":   "USPS truck spotted! Mail or package incoming.",
 }
 
 last_notification_time = 0
@@ -93,11 +97,11 @@ def grab_frame(rtsp_url, output_path):
 # this binary form held 0% on the same frame across 40 trials. We only invoke
 # the carrier classifier *after* two binary YES in a row.
 BINARY_PROMPT = (
-    "Is there a UPS, FedEx, Amazon, or USPS delivery vehicle clearly "
+    "Is there a UPS, FedEx, or Amazon delivery vehicle clearly "
     "visible in this image? ONLY say YES if you can clearly see one of "
-    "these carriers' branding (UPS shield, FedEx wordmark, Amazon smile, "
-    "or USPS markings). Say NO for unmarked vans, passenger cars, SUVs, "
-    "and anything else. Reply YES or NO only."
+    "these carriers' branding (UPS shield, FedEx wordmark, or Amazon "
+    "smile/Prime logo). Say NO for USPS trucks, unmarked vans, passenger "
+    "cars, SUVs, and anything else. Reply YES or NO only."
 )
 
 # Stage 2: only invoked after 2/2 binary confirm. Routes a confirmed delivery
@@ -200,8 +204,8 @@ def classify_carrier(image_path, alarm_s=15):
 _last_no_save = 0
 
 def save_detection(image_path, carrier, suffix=""):
-    """Save tracked-carrier frames always (UPS, FEDEX, AMAZON, USPS); rate-limit
-    NONE/OTHER background frames to NO_SAMPLE_INTERVAL to reduce SD card wear.
+    """Save tracked-carrier frames always (UPS, FEDEX, AMAZON); rate-limit
+    NONE/OTHER/USPS background frames to NO_SAMPLE_INTERVAL.
     Suffixed frames (tentative/confirm) always save — they're tied to a
     detection event, not the rolling background sample. Filename format:
     <CARRIER>_<ts>[_suffix].jpg
@@ -254,8 +258,8 @@ def cleanup_old_detections():
 def send_notification(image_path, carrier):
     """Route notifications by carrier:
       - UPS, FEDEX  → premium tier (PUSHOVER_USER_KEY) + all tier (PUSHOVER_KEY_ALL)
-      - AMAZON, USPS → all tier only
-      - other carriers → no notification
+      - AMAZON      → all tier only
+      - USPS / OTHER / NONE → no notification (USPS has building access)
 
     Cooldown applies globally (one notification per COOLDOWN window regardless
     of carrier — we don't want a UPS+Amazon back-to-back to ping twice).
