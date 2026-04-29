@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "description": "Labeled cases for evaluating the two-stage delivery-truck-detector pipeline. Each case carries a tentative frame (Stage 1 binary input) and a confirm frame (Stage 2 carrier input). For single-frame cases (e.g. confirmed catches with no separate tentative on hand), the same frame is used for both stages -- still meaningful since Stage 1 should fire YES and Stage 2 should classify the carrier correctly.",
+  "carrier_set": ["UPS", "FEDEX", "AMAZON", "USPS", "OTHER", "NONE"],
+  "tracked_carriers": ["UPS", "FEDEX", "AMAZON"],
+  "premium_carriers": ["UPS", "FEDEX"],
+  "cases": [
+    {
+      "id": "apr24_fedex_real",
+      "category": "real_delivery",
+      "description": "Real FedEx delivery, Apr 24 1:17pm. First production catch.",
+      "tentative_frame": "frames/apr24/fedex_real_confirm.jpg",
+      "confirm_frame": "frames/apr24/fedex_real_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "FEDEX",
+      "should_fire": true,
+      "expected_tier": "premium"
+    },
+    {
+      "id": "apr24_ups_real",
+      "category": "real_delivery",
+      "description": "Real UPS delivery, Apr 24 3:26pm. Second production catch.",
+      "tentative_frame": "frames/apr24/ups_real_confirm.jpg",
+      "confirm_frame": "frames/apr24/ups_real_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "UPS",
+      "should_fire": true,
+      "expected_tier": "premium"
+    },
+    {
+      "id": "apr27_amazon_first",
+      "category": "real_delivery",
+      "description": "Real Amazon delivery, Apr 27 11:50am. Missed under the old binary-confirm flow (Stage 2 carrier returned 5/5 AMAZON in offline test, but binary flickered).",
+      "tentative_frame": "frames/apr27/amazon_first_tentative.jpg",
+      "confirm_frame": "frames/apr27/amazon_first_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "AMAZON",
+      "should_fire": true,
+      "expected_tier": "all"
+    },
+    {
+      "id": "apr27_amazon_second",
+      "category": "real_delivery",
+      "description": "Same Amazon delivery as apr27_amazon_first, ~50s later. Same expected outcome.",
+      "tentative_frame": "frames/apr27/amazon_second_tentative.jpg",
+      "confirm_frame": "frames/apr27/amazon_second_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "AMAZON",
+      "should_fire": true,
+      "expected_tier": "all"
+    },
+    {
+      "id": "apr26_noise_hallucination",
+      "category": "noise",
+      "description": "The Apr 26 false-positive scene: parked passenger cars and lens glare. The old single-stage carrier prompt hallucinated UPS ~43% on this frame; binary held 0/40. End-to-end should reject.",
+      "tentative_frame": "frames/apr26/noise_tentative.jpg",
+      "confirm_frame": "frames/apr26/noise_confirm.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "NONE",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "apr29_fedex_driveby",
+      "category": "drive_by",
+      "description": "Cross-street FedEx drove through frame between polls: visible at T=0 (tentative), gone at T+11s (confirm). USPS truck visible in both. End-to-end should skip (drive-by + USPS is non-tracked).",
+      "tentative_frame": "frames/apr29/fedex_driveby_tentative.jpg",
+      "confirm_frame": "frames/apr29/fedex_driveby_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "USPS",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "apr27_usps_a",
+      "category": "usps",
+      "description": "USPS truck on cross street, Apr 27 5:21pm. Should be classified USPS (NON_TRACKED) and skipped.",
+      "tentative_frame": "frames/apr27/usps_a_confirm.jpg",
+      "confirm_frame": "frames/apr27/usps_a_confirm.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "USPS",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "apr27_usps_b",
+      "category": "usps",
+      "description": "USPS truck, Apr 27 5:33pm. Should skip.",
+      "tentative_frame": "frames/apr27/usps_b_confirm.jpg",
+      "confirm_frame": "frames/apr27/usps_b_confirm.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "USPS",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "apr27_usps_c",
+      "category": "usps",
+      "description": "USPS truck, Apr 27 5:44pm. Should skip.",
+      "tentative_frame": "frames/apr27/usps_c_confirm.jpg",
+      "confirm_frame": "frames/apr27/usps_c_confirm.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "USPS",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "apr29_empty_morning",
+      "category": "empty",
+      "description": "Empty residential street, no delivery vehicles. Bright morning light.",
+      "tentative_frame": "frames/apr29/empty_street_morning.jpg",
+      "confirm_frame": "frames/apr29/empty_street_morning.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "NONE",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "apr29_empty_afternoon",
+      "category": "empty",
+      "description": "Empty residential street, afternoon light, no delivery vehicles.",
+      "tentative_frame": "frames/apr29/empty_street_afternoon.jpg",
+      "confirm_frame": "frames/apr29/empty_street_afternoon.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "NONE",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "apr29_empty_pre_driveby",
+      "category": "empty",
+      "description": "30s before the Apr 29 cross-street FedEx drive-by; USPS truck already in frame but no other vehicles.",
+      "tentative_frame": "frames/apr29/empty_street_pre.jpg",
+      "confirm_frame": "frames/apr29/empty_street_pre.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "USPS",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "synthetic_amazon_sprinter",
+      "category": "synthetic_real",
+      "description": "Gemini-generated photorealistic Amazon Sprinter parked on residential street.",
+      "tentative_frame": "frames/synthetic/amazon_sprinter_parked.jpg",
+      "confirm_frame": "frames/synthetic/amazon_sprinter_parked.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "AMAZON",
+      "should_fire": true,
+      "expected_tier": "all"
+    },
+    {
+      "id": "synthetic_amazon_promaster",
+      "category": "synthetic_real",
+      "description": "Gemini-generated Amazon Ram ProMaster van with rear door open.",
+      "tentative_frame": "frames/synthetic/amazon_promaster_parked.jpg",
+      "confirm_frame": "frames/synthetic/amazon_promaster_parked.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "AMAZON",
+      "should_fire": true,
+      "expected_tier": "all"
+    },
+    {
+      "id": "synthetic_amazon_flex_sedan",
+      "category": "synthetic_edge",
+      "description": "Edge case: Amazon Flex driver in personal silver Camry. NOT a delivery van, despite the Amazon vest. Should not fire.",
+      "tentative_frame": "frames/synthetic/amazon_flex_sedan.jpg",
+      "confirm_frame": "frames/synthetic/amazon_flex_sedan.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "NONE",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "synthetic_plain_sprinter",
+      "category": "synthetic_edge",
+      "description": "Edge case: dark blue Mercedes Sprinter with NO branding. Should NOT be classified Amazon (false-positive risk for the carrier classifier).",
+      "tentative_frame": "frames/synthetic/plain_blue_sprinter.jpg",
+      "confirm_frame": "frames/synthetic/plain_blue_sprinter.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "OTHER",
+      "should_fire": false,
+      "expected_tier": null
+    }
+  ]
+}
