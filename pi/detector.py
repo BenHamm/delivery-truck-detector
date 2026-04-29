@@ -55,7 +55,7 @@ END_HOUR = int(os.environ.get("END_HOUR", "20"))
 # Rolling image log
 LOG_DIR = os.environ.get("LOG_DIR", "/home/pi/detections")
 LOG_RETENTION_HOURS = int(os.environ.get("LOG_RETENTION_HOURS", "36"))
-NO_SAMPLE_INTERVAL = int(os.environ.get("NO_SAMPLE_INTERVAL", "120"))  # save 1 NO frame every 2min — generous sampling for false-negative debugging
+NO_SAMPLE_INTERVAL = int(os.environ.get("NO_SAMPLE_INTERVAL", "25"))  # ~25s threshold: save every poll (polls run every ~36s), so every tentative YES has a NO frame from 30s prior for lead-up audit
 
 # Healthchecks.io dead-man's switch
 HC_PING_URL = os.environ.get("HC_PING_URL", "https://hc-ping.com/1d4cb30e-1d3e-4425-b6d9-f1f93590ca4c")
