@@ -1,6 +1,6 @@
 {
   "config": {
-    "label": "baseline (production, 21 cases)",
+    "label": "baseline",
     "binary_model": "google/gemini-3-flash-preview",
     "carrier_model": "google/gemini-3-flash-preview",
     "binary_prompt": "Is there a UPS, FedEx, or Amazon delivery vehicle clearly visible in this image? ONLY say YES if you can clearly see one of these carriers' branding (UPS shield, FedEx wordmark, or Amazon smile/Prime logo). Say NO for USPS trucks, unmarked vans, passenger cars, SUVs, and anything else. Reply YES or NO only.",
@@ -10,7 +10,7 @@
     "trials": 5,
     "max_tokens": 20
   },
-  "timestamp": "2026-04-29T22:24:44-0700",
+  "timestamp": "2026-04-30T08:12:27-0700",
   "dataset_version": 1,
   "n_cases": 21,
   "results": [
@@ -38,7 +38,7 @@
       "expected_fire": true,
       "expected_tier": "premium",
       "correct": true,
-      "tokens_in": 11970,
+      "tokens_in": 11971,
       "tokens_out": 15
     },
     {
@@ -65,7 +65,7 @@
       "expected_fire": true,
       "expected_tier": "premium",
       "correct": true,
-      "tokens_in": 11971,
+      "tokens_in": 11970,
       "tokens_out": 10
     },
     {
@@ -133,14 +133,14 @@
         "NO"
       ],
       "stage2_results": [
-        "NONE",
-        "NONE",
+        "UPS",
+        "UPS",
         "NONE",
         "UPS",
         "NONE"
       ],
       "stage1_majority": "NO",
-      "stage2_majority": "NONE",
+      "stage2_majority": "UPS",
       "actual_fire": false,
       "actual_tier": null,
       "expected_fire": false,
@@ -173,7 +173,7 @@
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11971,
+      "tokens_in": 11970,
       "tokens_out": 15
     },
     {
@@ -366,13 +366,13 @@
       "tokens_out": 15
     },
     {
-      "id": "apr29_uhaul_other",
-      "category": "other_vehicle",
+      "id": "apr29_fedex_partial_arrival",
+      "category": "real_delivery",
       "stage1_results": [
+        "NO",
         "YES",
         "NO",
-        "NO",
-        "NO",
+        "YES",
         "YES"
       ],
       "stage2_results": [
@@ -382,13 +382,13 @@
         "OTHER",
         "OTHER"
       ],
-      "stage1_majority": "NO",
+      "stage1_majority": "YES",
       "stage2_majority": "OTHER",
       "actual_fire": false,
       "actual_tier": null,
-      "expected_fire": false,
-      "expected_tier": null,
-      "correct": true,
+      "expected_fire": true,
+      "expected_tier": "premium",
+      "correct": false,
       "tokens_in": 11970,
       "tokens_out": 10
     },
@@ -396,9 +396,9 @@
       "id": "apr29_evening_dismissed_a",
       "category": "drive_by",
       "stage1_results": [
+        "NO",
         "YES",
-        "NO",
-        "NO",
+        "YES",
         "NO",
         "NO"
       ],
@@ -443,7 +443,7 @@
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11970,
+      "tokens_in": 11971,
       "tokens_out": 10
     },
     {
@@ -452,8 +452,8 @@
       "stage1_results": [
         "NO",
         "NO",
-        "NO",
-        "NO",
+        "YES",
+        "YES",
         "NO"
       ],
       "stage2_results": [
@@ -551,7 +551,7 @@
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11970,
+      "tokens_in": 11971,
       "tokens_out": 10
     },
     {

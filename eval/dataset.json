@@ -149,15 +149,15 @@
       "expected_tier": "premium"
     },
     {
-      "id": "apr29_uhaul_other",
-      "category": "other_vehicle",
-      "description": "U-Haul truck visible in scene, Apr 29 3:02pm. Delivery-shaped vehicle but no recognizable carrier branding -- Stage 2 correctly returned OTHER, skipped notification.",
-      "tentative_frame": "frames/apr29/uhaul_other_tentative.jpg",
-      "confirm_frame": "frames/apr29/uhaul_other_confirm.jpg",
+      "id": "apr29_fedex_partial_arrival",
+      "category": "real_delivery",
+      "description": "Real FedEx truck pulling in at Apr 29 3:02pm, partially occluded by tree (red Ex visible bottom-left). Stage 2 returned OTHER on this frame in production -- a Stage 2 miss. The next poll 45s later (apr29_fedex_real) caught it correctly. Useful for tracking Stage 2 sensitivity to partial / obscured views.",
+      "tentative_frame": "frames/apr29/fedex_partial_arrival_tentative.jpg",
+      "confirm_frame": "frames/apr29/fedex_partial_arrival_confirm.jpg",
       "expected_stage1_yes": true,
-      "expected_carrier": "OTHER",
-      "should_fire": false,
-      "expected_tier": null
+      "expected_carrier": "FEDEX",
+      "should_fire": true,
+      "expected_tier": "premium"
     },
     {
       "id": "apr29_evening_dismissed_a",
