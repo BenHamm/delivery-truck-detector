@@ -1,6 +1,6 @@
 {
   "config": {
-    "label": "baseline (production)",
+    "label": "baseline (production, 21 cases)",
     "binary_model": "google/gemini-3-flash-preview",
     "carrier_model": "google/gemini-3-flash-preview",
     "binary_prompt": "Is there a UPS, FedEx, or Amazon delivery vehicle clearly visible in this image? ONLY say YES if you can clearly see one of these carriers' branding (UPS shield, FedEx wordmark, or Amazon smile/Prime logo). Say NO for USPS trucks, unmarked vans, passenger cars, SUVs, and anything else. Reply YES or NO only.",
@@ -10,9 +10,9 @@
     "trials": 5,
     "max_tokens": 20
   },
-  "timestamp": "2026-04-29T14:33:54-0700",
+  "timestamp": "2026-04-29T22:24:44-0700",
   "dataset_version": 1,
-  "n_cases": 16,
+  "n_cases": 21,
   "results": [
     {
       "id": "apr24_fedex_real",
@@ -38,7 +38,7 @@
       "expected_fire": true,
       "expected_tier": "premium",
       "correct": true,
-      "tokens_in": 11971,
+      "tokens_in": 11970,
       "tokens_out": 15
     },
     {
@@ -65,7 +65,7 @@
       "expected_fire": true,
       "expected_tier": "premium",
       "correct": true,
-      "tokens_in": 11974,
+      "tokens_in": 11971,
       "tokens_out": 10
     },
     {
@@ -92,8 +92,8 @@
       "expected_fire": true,
       "expected_tier": "all",
       "correct": true,
-      "tokens_in": 11973,
-      "tokens_out": 18
+      "tokens_in": 11970,
+      "tokens_out": 20
     },
     {
       "id": "apr27_amazon_second",
@@ -119,8 +119,8 @@
       "expected_fire": true,
       "expected_tier": "all",
       "correct": true,
-      "tokens_in": 11971,
-      "tokens_out": 18
+      "tokens_in": 11970,
+      "tokens_out": 20
     },
     {
       "id": "apr26_noise_hallucination",
@@ -134,10 +134,10 @@
       ],
       "stage2_results": [
         "NONE",
+        "NONE",
+        "NONE",
         "UPS",
-        "NONE",
-        "NONE",
-        "UPS"
+        "NONE"
       ],
       "stage1_majority": "NO",
       "stage2_majority": "NONE",
@@ -173,7 +173,7 @@
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11970,
+      "tokens_in": 11971,
       "tokens_out": 15
     },
     {
@@ -282,7 +282,7 @@
       "expected_tier": null,
       "correct": true,
       "tokens_in": 11970,
-      "tokens_out": 27
+      "tokens_out": 10
     },
     {
       "id": "apr29_empty_afternoon",
@@ -308,8 +308,8 @@
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11971,
-      "tokens_out": 16
+      "tokens_in": 11970,
+      "tokens_out": 20
     },
     {
       "id": "apr29_empty_pre_driveby",
@@ -339,6 +339,141 @@
       "tokens_out": 15
     },
     {
+      "id": "apr29_fedex_real",
+      "category": "real_delivery",
+      "stage1_results": [
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
+      ],
+      "stage2_results": [
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX"
+      ],
+      "stage1_majority": "YES",
+      "stage2_majority": "FEDEX",
+      "actual_fire": true,
+      "actual_tier": "premium",
+      "expected_fire": true,
+      "expected_tier": "premium",
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 15
+    },
+    {
+      "id": "apr29_uhaul_other",
+      "category": "other_vehicle",
+      "stage1_results": [
+        "YES",
+        "NO",
+        "NO",
+        "NO",
+        "YES"
+      ],
+      "stage2_results": [
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER"
+      ],
+      "stage1_majority": "NO",
+      "stage2_majority": "OTHER",
+      "actual_fire": false,
+      "actual_tier": null,
+      "expected_fire": false,
+      "expected_tier": null,
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 10
+    },
+    {
+      "id": "apr29_evening_dismissed_a",
+      "category": "drive_by",
+      "stage1_results": [
+        "YES",
+        "NO",
+        "NO",
+        "NO",
+        "NO"
+      ],
+      "stage2_results": [
+        "NONE",
+        "NONE",
+        "NONE",
+        "NONE",
+        "NONE"
+      ],
+      "stage1_majority": "NO",
+      "stage2_majority": "NONE",
+      "actual_fire": false,
+      "actual_tier": null,
+      "expected_fire": false,
+      "expected_tier": null,
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 10
+    },
+    {
+      "id": "apr29_evening_dismissed_b",
+      "category": "drive_by",
+      "stage1_results": [
+        "NO",
+        "NO",
+        "NO",
+        "NO",
+        "NO"
+      ],
+      "stage2_results": [
+        "NONE",
+        "NONE",
+        "NONE",
+        "NONE",
+        "NONE"
+      ],
+      "stage1_majority": "NO",
+      "stage2_majority": "NONE",
+      "actual_fire": false,
+      "actual_tier": null,
+      "expected_fire": false,
+      "expected_tier": null,
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 10
+    },
+    {
+      "id": "apr29_evening_dismissed_c",
+      "category": "drive_by",
+      "stage1_results": [
+        "NO",
+        "NO",
+        "NO",
+        "NO",
+        "NO"
+      ],
+      "stage2_results": [
+        "NONE",
+        "NONE",
+        "NONE",
+        "NONE",
+        "NONE"
+      ],
+      "stage1_majority": "NO",
+      "stage2_majority": "NONE",
+      "actual_fire": false,
+      "actual_tier": null,
+      "expected_fire": false,
+      "expected_tier": null,
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 10
+    },
+    {
       "id": "synthetic_amazon_sprinter",
       "category": "synthetic_real",
       "stage1_results": [
@@ -363,7 +498,7 @@
       "expected_tier": "all",
       "correct": true,
       "tokens_in": 11970,
-      "tokens_out": 15
+      "tokens_out": 20
     },
     {
       "id": "synthetic_amazon_promaster",
@@ -389,8 +524,8 @@
       "expected_fire": true,
       "expected_tier": "all",
       "correct": true,
-      "tokens_in": 11971,
-      "tokens_out": 19
+      "tokens_in": 11970,
+      "tokens_out": 20
     },
     {
       "id": "synthetic_amazon_flex_sedan",

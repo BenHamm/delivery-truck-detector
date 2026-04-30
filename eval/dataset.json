@@ -138,6 +138,61 @@
       "expected_tier": null
     },
     {
+      "id": "apr29_fedex_real",
+      "category": "real_delivery",
+      "description": "Real FedEx delivery, Apr 29 3:03pm. Stage 1 YES, Stage 2 returned FEDEX, fired notifications to both tiers in production.",
+      "tentative_frame": "frames/apr29/fedex_real_tentative.jpg",
+      "confirm_frame": "frames/apr29/fedex_real_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "FEDEX",
+      "should_fire": true,
+      "expected_tier": "premium"
+    },
+    {
+      "id": "apr29_uhaul_other",
+      "category": "other_vehicle",
+      "description": "U-Haul truck visible in scene, Apr 29 3:02pm. Delivery-shaped vehicle but no recognizable carrier branding -- Stage 2 correctly returned OTHER, skipped notification.",
+      "tentative_frame": "frames/apr29/uhaul_other_tentative.jpg",
+      "confirm_frame": "frames/apr29/uhaul_other_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "OTHER",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "apr29_evening_dismissed_a",
+      "category": "drive_by",
+      "description": "Evening Stage 1 YES at 5:43pm. No clearly visible delivery vehicle -- possibly glare/distance confusion. Stage 2 returned NONE, dismissed.",
+      "tentative_frame": "frames/apr29/evening_dismissed_a_tentative.jpg",
+      "confirm_frame": "frames/apr29/evening_dismissed_a_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "NONE",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "apr29_evening_dismissed_b",
+      "category": "drive_by",
+      "description": "Evening Stage 1 YES at 5:51pm. Same pattern as evening_dismissed_a -- Stage 2 returned NONE.",
+      "tentative_frame": "frames/apr29/evening_dismissed_b_tentative.jpg",
+      "confirm_frame": "frames/apr29/evening_dismissed_b_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "NONE",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "apr29_evening_dismissed_c",
+      "category": "drive_by",
+      "description": "Evening Stage 1 YES at 5:52pm, ~45s after evening_dismissed_b. Stage 2 returned NONE.",
+      "tentative_frame": "frames/apr29/evening_dismissed_c_tentative.jpg",
+      "confirm_frame": "frames/apr29/evening_dismissed_c_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "NONE",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
       "id": "synthetic_amazon_sprinter",
       "category": "synthetic_real",
       "description": "Gemini-generated photorealistic Amazon Sprinter parked on residential street.",
