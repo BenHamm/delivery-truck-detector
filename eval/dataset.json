@@ -116,15 +116,15 @@
       "expected_tier": null
     },
     {
-      "id": "apr29_empty_afternoon",
-      "category": "empty",
-      "description": "Empty residential street, afternoon light, no delivery vehicles.",
-      "tentative_frame": "frames/apr29/empty_street_afternoon.jpg",
-      "confirm_frame": "frames/apr29/empty_street_afternoon.jpg",
-      "expected_stage1_yes": false,
-      "expected_carrier": "NONE",
-      "should_fire": false,
-      "expected_tier": null
+      "id": "apr29_amazon_missed_afternoon",
+      "category": "real_delivery",
+      "description": "Real Amazon DSP-style delivery van parked in the street, Apr 29 1:49pm. PRODUCTION MISS: Stage 1's restrictive prompt said NO, no notification fired, no _confirm frame saved. Originally mislabeled in this dataset as an empty-street case until eyeballing the frame revealed the van. Important regression-tracking case for the restrictive Stage 1 prompt.",
+      "tentative_frame": "frames/apr29/amazon_missed_afternoon.jpg",
+      "confirm_frame": "frames/apr29/amazon_missed_afternoon.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "AMAZON",
+      "should_fire": true,
+      "expected_tier": "all"
     },
     {
       "id": "apr29_empty_pre_driveby",

@@ -1,16 +1,16 @@
 {
   "config": {
-    "label": "baseline",
-    "binary_model": "google/gemini-3-flash-preview",
-    "carrier_model": "google/gemini-3-flash-preview",
-    "binary_prompt": "Is there a UPS, FedEx, or Amazon delivery vehicle clearly visible in this image? ONLY say YES if you can clearly see one of these carriers' branding (UPS shield, FedEx wordmark, or Amazon smile/Prime logo). Say NO for USPS trucks, unmarked vans, passenger cars, SUVs, and anything else. Reply YES or NO only.",
+    "label": "permissive-binary-mandarin-qwen",
+    "binary_model": "qwen/qwen3-vl-8b-instruct",
+    "carrier_model": "qwen/qwen3-vl-8b-instruct",
+    "binary_prompt": "\u56fe\u7247\u4e2d\u662f\u5426\u6709\u5feb\u9012\u8f66\u8f86\uff1f\u5feb\u9012\u8f66\u8f86\u6307\u7684\u662f UPS\u3001FedEx\u3001\u4e9a\u9a6c\u900a\u3001USPS \u7b49\u5feb\u9012\u516c\u53f8\u6216\u5176\u4ed6\u5546\u4e1a\u5feb\u9012\u670d\u52a1\u6240\u4f7f\u7528\u7684\u5927\u578b\u53a2\u5f0f\u8d27\u8f66\u3001\u6b65\u5165\u5f0f\u8d27\u8f66\u3001\u7bb1\u5f0f\u5361\u8f66\u6216\u8d27\u8fd0\u9762\u5305\u8f66\u3002\u4e0d\u9700\u8981\u770b\u5230\u54c1\u724c\u6807\u8bc6\uff1a\u4e00\u8f86\u767d\u8272\u6216\u6df1\u8272\u65e0\u6807\u8bc6\u7684 Sprinter \u5927\u5c0f\u7684\u8d27\u8f66\u4e5f\u7b97\u3002\u5982\u679c\u770b\u5230\u81f3\u5c11\u4e00\u8f86\u8fd9\u6837\u7684\u8f66\u8f86\uff0c\u8bf7\u56de\u7b54 YES\u3002\u53ea\u6709\u5f53\u753b\u9762\u4e2d\u6240\u6709\u53ef\u89c1\u8f66\u8f86\u660e\u663e\u90fd\u662f\u666e\u901a\u8f7f\u8f66\u3001SUV\u3001\u76ae\u5361\u6216\u6469\u6258\u8f66\u65f6\uff0c\u624d\u56de\u7b54 NO\u3002\u8bf7\u53ea\u56de\u7b54 YES \u6216 NO\u3002",
     "carrier_prompt": "Look at this image. Identify the most prominent delivery vehicle, if any. Reply with ONE word from this list:\n- UPS (brown truck/van with UPS branding)\n- FEDEX (white truck/van with FedEx branding, purple/orange wordmark)\n- AMAZON (dark blue Sprinter or ProMaster van with Amazon smile or Prime logo)\n- USPS (white postal truck with USPS branding)\n- OTHER (delivery-purpose truck/van without identifiable carrier)\n- NONE (no delivery vehicle; parked passenger cars do not count)\nReply with ONLY one word from the list.",
     "resize_max": null,
     "jpeg_quality": 75,
     "trials": 5,
     "max_tokens": 20
   },
-  "timestamp": "2026-05-01T11:42:14-0700",
+  "timestamp": "2026-05-01T11:03:16-0700",
   "dataset_version": 1,
   "n_cases": 25,
   "results": [
@@ -38,8 +38,8 @@
       "expected_fire": true,
       "expected_tier": "premium",
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 15
+      "tokens_in": 10030,
+      "tokens_out": 25
     },
     {
       "id": "apr24_ups_real",
@@ -65,8 +65,8 @@
       "expected_fire": true,
       "expected_tier": "premium",
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 10
+      "tokens_in": 10030,
+      "tokens_out": 20
     },
     {
       "id": "apr27_amazon_first",
@@ -79,20 +79,20 @@
         "YES"
       ],
       "stage2_results": [
-        "AMAZON",
-        "AMAZON",
-        "AMAZON",
-        "AMAZON",
-        "AMAZON"
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER"
       ],
       "stage1_majority": "YES",
-      "stage2_majority": "AMAZON",
-      "actual_fire": true,
-      "actual_tier": "all",
+      "stage2_majority": "OTHER",
+      "actual_fire": false,
+      "actual_tier": null,
       "expected_fire": true,
       "expected_tier": "all",
-      "correct": true,
-      "tokens_in": 11970,
+      "correct": false,
+      "tokens_in": 10030,
       "tokens_out": 20
     },
     {
@@ -106,20 +106,20 @@
         "YES"
       ],
       "stage2_results": [
-        "AMAZON",
-        "AMAZON",
-        "AMAZON",
-        "AMAZON",
-        "AMAZON"
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER"
       ],
       "stage1_majority": "YES",
-      "stage2_majority": "AMAZON",
-      "actual_fire": true,
-      "actual_tier": "all",
+      "stage2_majority": "OTHER",
+      "actual_fire": false,
+      "actual_tier": null,
       "expected_fire": true,
       "expected_tier": "all",
-      "correct": true,
-      "tokens_in": 11970,
+      "correct": false,
+      "tokens_in": 10030,
       "tokens_out": 20
     },
     {
@@ -133,9 +133,9 @@
         "NO"
       ],
       "stage2_results": [
-        "UPS",
         "NONE",
-        "UPS",
+        "NONE",
+        "NONE",
         "NONE",
         "NONE"
       ],
@@ -146,8 +146,8 @@
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 10
+      "tokens_in": 10030,
+      "tokens_out": 20
     },
     {
       "id": "apr29_fedex_driveby",
@@ -173,8 +173,8 @@
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 15
+      "tokens_in": 10030,
+      "tokens_out": 25
     },
     {
       "id": "apr27_usps_a",
@@ -184,78 +184,78 @@
         "NO",
         "NO",
         "NO",
-        "NO"
+        "YES"
       ],
       "stage2_results": [
-        "USPS",
-        "USPS",
-        "USPS",
-        "USPS",
-        "USPS"
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER"
       ],
       "stage1_majority": "NO",
-      "stage2_majority": "USPS",
+      "stage2_majority": "OTHER",
       "actual_fire": false,
       "actual_tier": null,
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 15
+      "tokens_in": 10030,
+      "tokens_out": 20
     },
     {
       "id": "apr27_usps_b",
       "category": "usps",
       "stage1_results": [
-        "NO",
-        "NO",
-        "NO",
-        "NO",
-        "NO"
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
       ],
       "stage2_results": [
-        "USPS",
-        "USPS",
-        "USPS",
-        "USPS",
-        "USPS"
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER"
       ],
-      "stage1_majority": "NO",
-      "stage2_majority": "USPS",
+      "stage1_majority": "YES",
+      "stage2_majority": "OTHER",
       "actual_fire": false,
       "actual_tier": null,
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 15
+      "tokens_in": 10030,
+      "tokens_out": 20
     },
     {
       "id": "apr27_usps_c",
       "category": "usps",
       "stage1_results": [
-        "NO",
-        "NO",
-        "NO",
-        "NO",
-        "NO"
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
       ],
       "stage2_results": [
-        "USPS",
-        "USPS",
-        "USPS",
-        "USPS",
-        "USPS"
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER"
       ],
-      "stage1_majority": "NO",
-      "stage2_majority": "USPS",
+      "stage1_majority": "YES",
+      "stage2_majority": "OTHER",
       "actual_fire": false,
       "actual_tier": null,
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 15
+      "tokens_in": 10030,
+      "tokens_out": 20
     },
     {
       "id": "apr29_empty_morning",
@@ -281,62 +281,62 @@
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 10
+      "tokens_in": 10030,
+      "tokens_out": 20
     },
     {
-      "id": "apr29_amazon_missed_afternoon",
-      "category": "real_delivery",
+      "id": "apr29_empty_afternoon",
+      "category": "empty",
       "stage1_results": [
-        "NO",
-        "NO",
-        "NO",
-        "NO",
-        "NO"
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
       ],
       "stage2_results": [
-        "AMAZON",
-        "AMAZON",
-        "AMAZON",
-        "AMAZON",
-        "AMAZON"
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER"
       ],
-      "stage1_majority": "NO",
-      "stage2_majority": "AMAZON",
+      "stage1_majority": "YES",
+      "stage2_majority": "OTHER",
       "actual_fire": false,
       "actual_tier": null,
-      "expected_fire": true,
-      "expected_tier": "all",
-      "correct": false,
-      "tokens_in": 11970,
+      "expected_fire": false,
+      "expected_tier": null,
+      "correct": true,
+      "tokens_in": 10030,
       "tokens_out": 20
     },
     {
       "id": "apr29_empty_pre_driveby",
       "category": "empty",
       "stage1_results": [
-        "NO",
-        "NO",
-        "NO",
-        "NO",
-        "NO"
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
       ],
       "stage2_results": [
-        "USPS",
-        "USPS",
-        "USPS",
-        "USPS",
-        "USPS"
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER"
       ],
-      "stage1_majority": "NO",
-      "stage2_majority": "USPS",
+      "stage1_majority": "YES",
+      "stage2_majority": "OTHER",
       "actual_fire": false,
       "actual_tier": null,
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 15
+      "tokens_in": 10030,
+      "tokens_out": 20
     },
     {
       "id": "apr29_fedex_real",
@@ -347,33 +347,6 @@
         "YES",
         "YES",
         "YES"
-      ],
-      "stage2_results": [
-        "FEDEX",
-        "FEDEX",
-        "FEDEX",
-        "FEDEX",
-        "FEDEX"
-      ],
-      "stage1_majority": "YES",
-      "stage2_majority": "FEDEX",
-      "actual_fire": true,
-      "actual_tier": "premium",
-      "expected_fire": true,
-      "expected_tier": "premium",
-      "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 15
-    },
-    {
-      "id": "apr29_fedex_partial_arrival",
-      "category": "real_delivery",
-      "stage1_results": [
-        "YES",
-        "YES",
-        "YES",
-        "NO",
-        "NO"
       ],
       "stage2_results": [
         "OTHER",
@@ -389,15 +362,42 @@
       "expected_fire": true,
       "expected_tier": "premium",
       "correct": false,
-      "tokens_in": 11970,
-      "tokens_out": 10
+      "tokens_in": 10030,
+      "tokens_out": 20
+    },
+    {
+      "id": "apr29_fedex_partial_arrival",
+      "category": "real_delivery",
+      "stage1_results": [
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
+      ],
+      "stage2_results": [
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER"
+      ],
+      "stage1_majority": "YES",
+      "stage2_majority": "OTHER",
+      "actual_fire": false,
+      "actual_tier": null,
+      "expected_fire": true,
+      "expected_tier": "premium",
+      "correct": false,
+      "tokens_in": 10030,
+      "tokens_out": 20
     },
     {
       "id": "apr29_evening_dismissed_a",
       "category": "drive_by",
       "stage1_results": [
         "NO",
-        "YES",
+        "NO",
         "NO",
         "NO",
         "NO"
@@ -416,8 +416,8 @@
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 10
+      "tokens_in": 10030,
+      "tokens_out": 20
     },
     {
       "id": "apr29_evening_dismissed_b",
@@ -443,14 +443,14 @@
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 10
+      "tokens_in": 10030,
+      "tokens_out": 20
     },
     {
       "id": "apr29_evening_dismissed_c",
       "category": "drive_by",
       "stage1_results": [
-        "YES",
+        "NO",
         "NO",
         "NO",
         "NO",
@@ -470,8 +470,8 @@
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 10
+      "tokens_in": 10030,
+      "tokens_out": 20
     },
     {
       "id": "synthetic_amazon_sprinter",
@@ -497,8 +497,8 @@
       "expected_fire": true,
       "expected_tier": "all",
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 20
+      "tokens_in": 11550,
+      "tokens_out": 30
     },
     {
       "id": "synthetic_amazon_promaster",
@@ -524,45 +524,34 @@
       "expected_fire": true,
       "expected_tier": "all",
       "correct": true,
-      "tokens_in": 11971,
-      "tokens_out": 20
+      "tokens_in": 11550,
+      "tokens_out": 30
     },
     {
       "id": "synthetic_amazon_flex_sedan",
       "category": "synthetic_edge",
-      "stage1_results": [
-        "NO",
-        "NO",
-        "NO",
-        "NO",
-        "NO"
-      ],
-      "stage2_results": [
-        "NONE",
-        "NONE",
-        "NONE",
-        "NONE",
-        "NONE"
-      ],
-      "stage1_majority": "NO",
-      "stage2_majority": "NONE",
-      "actual_fire": false,
+      "error": "HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by SSLError(SSLError(1, '[SSL: SSLV3_ALERT_BAD_RECORD_MAC] ssl/tls alert bad record mac (_ssl.c:2648)')))",
+      "correct": false,
+      "stage1_results": [],
+      "stage2_results": [],
+      "stage1_majority": null,
+      "stage2_majority": null,
+      "actual_fire": null,
       "actual_tier": null,
       "expected_fire": false,
       "expected_tier": null,
-      "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 10
+      "tokens_in": 0,
+      "tokens_out": 0
     },
     {
       "id": "synthetic_plain_sprinter",
       "category": "synthetic_edge",
       "stage1_results": [
-        "NO",
-        "NO",
-        "NO",
-        "NO",
-        "NO"
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
       ],
       "stage2_results": [
         "OTHER",
@@ -571,15 +560,15 @@
         "OTHER",
         "OTHER"
       ],
-      "stage1_majority": "NO",
+      "stage1_majority": "YES",
       "stage2_majority": "OTHER",
       "actual_fire": false,
       "actual_tier": null,
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 10
+      "tokens_in": 11550,
+      "tokens_out": 20
     },
     {
       "id": "apr30_fedex_morning",
@@ -605,8 +594,8 @@
       "expected_fire": true,
       "expected_tier": "premium",
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 15
+      "tokens_in": 10030,
+      "tokens_out": 25
     },
     {
       "id": "apr30_ups_real",
@@ -632,8 +621,8 @@
       "expected_fire": true,
       "expected_tier": "premium",
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 10
+      "tokens_in": 10030,
+      "tokens_out": 20
     },
     {
       "id": "apr30_amazon_real",
@@ -646,20 +635,20 @@
         "YES"
       ],
       "stage2_results": [
-        "AMAZON",
-        "AMAZON",
-        "AMAZON",
-        "AMAZON",
-        "AMAZON"
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER",
+        "OTHER"
       ],
       "stage1_majority": "YES",
-      "stage2_majority": "AMAZON",
-      "actual_fire": true,
-      "actual_tier": "all",
+      "stage2_majority": "OTHER",
+      "actual_fire": false,
+      "actual_tier": null,
       "expected_fire": true,
       "expected_tier": "all",
-      "correct": true,
-      "tokens_in": 11970,
+      "correct": false,
+      "tokens_in": 10030,
       "tokens_out": 20
     },
     {
@@ -686,8 +675,8 @@
       "expected_fire": true,
       "expected_tier": "premium",
       "correct": true,
-      "tokens_in": 11970,
-      "tokens_out": 15
+      "tokens_in": 10030,
+      "tokens_out": 25
     }
   ]
 }
