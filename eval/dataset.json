@@ -235,6 +235,50 @@
       "expected_carrier": "OTHER",
       "should_fire": false,
       "expected_tier": null
+    },
+    {
+      "id": "apr30_fedex_morning",
+      "category": "real_delivery",
+      "description": "Real FedEx Express truck, Apr 30 10:58am. Full FedEx logo dead center on truck side panel, parked on the street. Production fired premium tier.",
+      "tentative_frame": "frames/apr30/fedex_morning_tentative.jpg",
+      "confirm_frame": "frames/apr30/fedex_morning_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "FEDEX",
+      "should_fire": true,
+      "expected_tier": "premium"
+    },
+    {
+      "id": "apr30_ups_real",
+      "category": "real_delivery",
+      "description": "Real UPS truck, Apr 30 11:16am. Brown UPS package car parked on the street. Production fired premium tier.",
+      "tentative_frame": "frames/apr30/ups_real_tentative.jpg",
+      "confirm_frame": "frames/apr30/ups_real_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "UPS",
+      "should_fire": true,
+      "expected_tier": "premium"
+    },
+    {
+      "id": "apr30_amazon_real",
+      "category": "real_delivery",
+      "description": "Real Amazon delivery, Apr 30 11:43am. Dark navy DSP-style delivery van parked on the street. Production fired all-carriers tier.",
+      "tentative_frame": "frames/apr30/amazon_real_tentative.jpg",
+      "confirm_frame": "frames/apr30/amazon_real_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "AMAZON",
+      "should_fire": true,
+      "expected_tier": "all"
+    },
+    {
+      "id": "apr30_fedex_afternoon",
+      "category": "real_delivery",
+      "description": "Real FedEx Express truck, Apr 30 1:49pm. Same parking spot as the 10:58 morning catch (bottom-left of frame, partially behind tree). Red 'Ex' visible. Production fired premium tier.",
+      "tentative_frame": "frames/apr30/fedex_afternoon_tentative.jpg",
+      "confirm_frame": "frames/apr30/fedex_afternoon_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "FEDEX",
+      "should_fire": true,
+      "expected_tier": "premium"
     }
   ]
 }

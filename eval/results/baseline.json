@@ -10,9 +10,9 @@
     "trials": 5,
     "max_tokens": 20
   },
-  "timestamp": "2026-04-30T08:12:27-0700",
+  "timestamp": "2026-04-30T20:52:12-0700",
   "dataset_version": 1,
-  "n_cases": 21,
+  "n_cases": 25,
   "results": [
     {
       "id": "apr24_fedex_real",
@@ -38,7 +38,7 @@
       "expected_fire": true,
       "expected_tier": "premium",
       "correct": true,
-      "tokens_in": 11971,
+      "tokens_in": 11970,
       "tokens_out": 15
     },
     {
@@ -136,8 +136,8 @@
         "UPS",
         "UPS",
         "NONE",
-        "UPS",
-        "NONE"
+        "NONE",
+        "UPS"
       ],
       "stage1_majority": "NO",
       "stage2_majority": "UPS",
@@ -292,7 +292,7 @@
         "NO",
         "NO",
         "NO",
-        "NO"
+        "YES"
       ],
       "stage2_results": [
         "AMAZON",
@@ -372,7 +372,7 @@
         "NO",
         "YES",
         "NO",
-        "YES",
+        "NO",
         "YES"
       ],
       "stage2_results": [
@@ -382,7 +382,7 @@
         "OTHER",
         "OTHER"
       ],
-      "stage1_majority": "YES",
+      "stage1_majority": "NO",
       "stage2_majority": "OTHER",
       "actual_fire": false,
       "actual_tier": null,
@@ -398,7 +398,7 @@
       "stage1_results": [
         "NO",
         "YES",
-        "YES",
+        "NO",
         "NO",
         "NO"
       ],
@@ -443,7 +443,7 @@
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11971,
+      "tokens_in": 11970,
       "tokens_out": 10
     },
     {
@@ -452,8 +452,8 @@
       "stage1_results": [
         "NO",
         "NO",
-        "YES",
-        "YES",
+        "NO",
+        "NO",
         "NO"
       ],
       "stage2_results": [
@@ -551,7 +551,7 @@
       "expected_fire": false,
       "expected_tier": null,
       "correct": true,
-      "tokens_in": 11971,
+      "tokens_in": 11970,
       "tokens_out": 10
     },
     {
@@ -580,6 +580,114 @@
       "correct": true,
       "tokens_in": 11970,
       "tokens_out": 10
+    },
+    {
+      "id": "apr30_fedex_morning",
+      "category": "real_delivery",
+      "stage1_results": [
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
+      ],
+      "stage2_results": [
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX"
+      ],
+      "stage1_majority": "YES",
+      "stage2_majority": "FEDEX",
+      "actual_fire": true,
+      "actual_tier": "premium",
+      "expected_fire": true,
+      "expected_tier": "premium",
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 15
+    },
+    {
+      "id": "apr30_ups_real",
+      "category": "real_delivery",
+      "stage1_results": [
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
+      ],
+      "stage2_results": [
+        "UPS",
+        "UPS",
+        "UPS",
+        "UPS",
+        "UPS"
+      ],
+      "stage1_majority": "YES",
+      "stage2_majority": "UPS",
+      "actual_fire": true,
+      "actual_tier": "premium",
+      "expected_fire": true,
+      "expected_tier": "premium",
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 10
+    },
+    {
+      "id": "apr30_amazon_real",
+      "category": "real_delivery",
+      "stage1_results": [
+        "YES",
+        "YES",
+        "NO",
+        "YES",
+        "YES"
+      ],
+      "stage2_results": [
+        "AMAZON",
+        "AMAZON",
+        "AMAZON",
+        "AMAZON",
+        "AMAZON"
+      ],
+      "stage1_majority": "YES",
+      "stage2_majority": "AMAZON",
+      "actual_fire": true,
+      "actual_tier": "all",
+      "expected_fire": true,
+      "expected_tier": "all",
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 20
+    },
+    {
+      "id": "apr30_fedex_afternoon",
+      "category": "real_delivery",
+      "stage1_results": [
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
+      ],
+      "stage2_results": [
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX"
+      ],
+      "stage1_majority": "YES",
+      "stage2_majority": "FEDEX",
+      "actual_fire": true,
+      "actual_tier": "premium",
+      "expected_fire": true,
+      "expected_tier": "premium",
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 15
     }
   ]
 }
