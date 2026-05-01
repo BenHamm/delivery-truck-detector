@@ -33,6 +33,15 @@ STREAM = os.environ.get("STREAM", "stream1")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-3-flash-preview")
 
+# Orin local Stage 1 (Qwen3-VL-8B via llama-server, OpenAI-compatible).
+# Optional: when ORIN_BASE_URL is set, Stage 1 polls hit Orin first and
+# fall back to OpenRouter only if Orin times out or errors. When unset
+# (default), behavior is identical to the all-Gemini pipeline.
+# Validated architecture in eval: Qwen Stage 1 (permissive prompt)
+# + Gemini Stage 2 = 24/25 vs all-Gemini baseline 23/25.
+ORIN_BASE_URL = os.environ.get("ORIN_BASE_URL", "")  # e.g. http://100.118.29.32:8080/v1
+ORIN_MODEL = os.environ.get("ORIN_MODEL", "qwen3-vl")  # llama-server ignores name but it goes in the request
+
 # Pushover — two recipient tiers
 # PUSHOVER_USER_KEY: the "premium" tier (UPS + FedEx only). Greg's account, or
 #   eventually a Delivery Group of users who don't want Amazon spam.
@@ -105,6 +114,21 @@ BINARY_PROMPT = (
     "cars, SUVs, and anything else. Reply YES or NO only."
 )
 
+# Permissive Stage 1 prompt used ONLY against Orin/Qwen. Smaller open-weight
+# models can spot delivery-shaped vehicles reliably but can't be trusted to
+# distinguish carrier branding precisely; we let Stage 2 (Gemini) make that
+# call. Validated against the 25-case eval at 24/25 with this exact prompt.
+BINARY_PROMPT_PERMISSIVE = (
+    "Is there any delivery-shaped vehicle visible in this image? A "
+    "delivery-shaped vehicle is a large van, step van, box truck, or "
+    "cargo van -- of the kind used by carriers like UPS, FedEx, Amazon, "
+    "USPS, or other commercial delivery services. Branding is NOT "
+    "required: an unmarked white or dark van the size of a Sprinter "
+    "still counts. Reply YES if you see at least one such vehicle. "
+    "Reply NO only if the only vehicles visible are clearly passenger "
+    "cars, SUVs, sedans, pickup trucks, or motorcycles. Reply YES or NO only."
+)
+
 # Stage 2: invoked on a fresh frame 5s after a tentative binary YES. Doubles
 # as both the drive-by filter (a moving truck is gone -> carrier=NONE) and
 # the routing classifier (carrier in TRACKED -> notify the right tier).
@@ -121,15 +145,53 @@ CARRIER_PROMPT = (
 )
 
 
-def _gemini_call(image_path, prompt, alarm_s=25):
-    """Shared HTTP path for Gemini classification. Returns the raw upper-cased
-    response, or None on failure (timeout / 3 retries exhausted).
+def _openai_compatible_call(base_url, api_key, model, image_b64, prompt,
+                            connect_timeout, read_timeout, retries=3):
+    """Generic OpenAI-compatible /chat/completions call. Returns raw
+    upper-cased content string, or None on failure (TimeoutError propagates).
+    Used for both OpenRouter (Gemini) and a local Orin llama-server."""
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = "Bearer " + api_key
+    for attempt in range(retries):
+        try:
+            resp = requests.post(
+                base_url.rstrip("/") + "/chat/completions",
+                headers=headers,
+                json={
+                    "model": model,
+                    "max_tokens": 20,
+                    "messages": [{
+                        "role": "user",
+                        "content": [
+                            {"type": "image_url", "image_url": {
+                                "url": "data:image/jpeg;base64," + image_b64}},
+                            {"type": "text", "text": prompt},
+                        ],
+                    }],
+                },
+                timeout=(connect_timeout, read_timeout),
+            )
+            resp.raise_for_status()
+            return (resp.json()["choices"][0]["message"].get("content") or "").strip().upper()
+        except TimeoutError:
+            raise
+        except Exception as e:
+            if attempt < retries - 1:
+                log.warning("LLM call attempt %d failed (%s): %s",
+                            attempt + 1, base_url, e)
+                time.sleep(1)
+            else:
+                log.error("LLM call failed after %d attempts (%s): %s",
+                          retries, base_url, e)
+                return None
 
-    Hard SIGALRM backstop prevents a stalled HTTP call from blocking long
-    enough to trigger the systemd watchdog (1 min). alarm_s=25 for primary
-    binary polls, alarm_s=15 for the carrier confirm (worst-case stack:
-    25 binary + 5 sleep + 15 carrier = 45s).
-    """
+
+def _gemini_call(image_path, prompt, alarm_s=25):
+    """Shared OpenRouter/Gemini path. Returns the raw upper-cased response,
+    or None on failure. Hard SIGALRM backstop prevents a stalled HTTP call
+    from triggering the systemd watchdog. alarm_s=25 for primary binary
+    polls, alarm_s=15 for the carrier confirm."""
     def _alarm_handler(signum, frame):
         raise TimeoutError("Gemini hard timeout")
 
@@ -139,39 +201,11 @@ def _gemini_call(image_path, prompt, alarm_s=25):
     signal.signal(signal.SIGALRM, _alarm_handler)
     signal.alarm(alarm_s)
     try:
-        for attempt in range(3):
-            try:
-                resp = requests.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers={
-                        "Authorization": "Bearer " + OPENROUTER_API_KEY,
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": OPENROUTER_MODEL,
-                        "max_tokens": 20,
-                        "messages": [{
-                            "role": "user",
-                            "content": [
-                                {"type": "image_url", "image_url": {
-                                    "url": "data:image/jpeg;base64," + b64}},
-                                {"type": "text", "text": prompt},
-                            ],
-                        }],
-                    },
-                    timeout=(10, 20),
-                )
-                resp.raise_for_status()
-                return (resp.json()["choices"][0]["message"].get("content") or "").strip().upper()
-            except TimeoutError:
-                raise
-            except Exception as e:
-                if attempt < 2:
-                    log.warning("Gemini attempt %d failed: %s", attempt + 1, e)
-                    time.sleep(1)
-                else:
-                    log.error("Gemini failed after 3 attempts")
-                    return None
+        return _openai_compatible_call(
+            "https://openrouter.ai/api/v1", OPENROUTER_API_KEY,
+            OPENROUTER_MODEL, b64, prompt,
+            connect_timeout=10, read_timeout=20, retries=3,
+        )
     except TimeoutError:
         log.error("Gemini hard timeout (%ds)", alarm_s)
         return None
@@ -179,22 +213,64 @@ def _gemini_call(image_path, prompt, alarm_s=25):
         signal.alarm(0)
 
 
+def _orin_call(image_path, prompt, alarm_s=20):
+    """Stage 1 path against the local Orin llama-server. Returns the raw
+    upper-cased response, or None on any failure (caller falls back to
+    Gemini). Smoke-tested at ~11s per inference on a Jetson AGX Orin with
+    Qwen3-VL-8B Q4_K_M; alarm_s=20 leaves comfortable headroom while still
+    failing fast if the Orin is genuinely hung."""
+    if not ORIN_BASE_URL:
+        return None
+
+    def _alarm_handler(signum, frame):
+        raise TimeoutError("Orin hard timeout")
+
+    with open(image_path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode()
+
+    signal.signal(signal.SIGALRM, _alarm_handler)
+    signal.alarm(alarm_s)
+    try:
+        return _openai_compatible_call(
+            ORIN_BASE_URL, "", ORIN_MODEL, b64, prompt,
+            connect_timeout=3, read_timeout=18, retries=1,  # fail fast
+        )
+    except TimeoutError:
+        log.warning("Orin hard timeout (%ds) -- falling back to Gemini", alarm_s)
+        return None
+    finally:
+        signal.alarm(0)
+
+
 def is_delivery_truck(image_path, alarm_s=25):
-    """Stage 1 binary gate. True iff Gemini sees a tracked-carrier delivery
-    vehicle. Failures (timeout, network) return False — the systemd watchdog
-    and healthcheck will catch sustained outages."""
+    """Stage 1 binary gate. Try Orin (Qwen3-VL-8B local, permissive prompt)
+    first; on any failure, fall back to Gemini (restrictive prompt). When
+    ORIN_BASE_URL is unset, this is identical to the all-Gemini path.
+
+    Failures of BOTH backends return False -- the systemd watchdog and
+    healthcheck catch sustained outages."""
+    if ORIN_BASE_URL:
+        raw = _orin_call(image_path, BINARY_PROMPT_PERMISSIVE)
+        if raw is not None:
+            is_yes = "YES" in raw
+            log.info("Gate (orin): %r -> %s", raw[:30], "YES" if is_yes else "NO")
+            ping_healthcheck()
+            return is_yes
+        log.warning("Orin Stage 1 unavailable -- falling back to Gemini")
+
     raw = _gemini_call(image_path, BINARY_PROMPT, alarm_s)
     if raw is None:
         return False
     is_yes = "YES" in raw
-    log.info("Gate: %r -> %s", raw[:30], "YES" if is_yes else "NO")
+    log.info("Gate (gemini): %r -> %s", raw[:30], "YES" if is_yes else "NO")
     ping_healthcheck()  # successful call = pipeline healthy
     return is_yes
 
 
 def classify_carrier(image_path, alarm_s=15):
     """Stage 2 carrier classifier. Invoked on the +5s frame after a tentative
-    binary YES, doubling as drive-by filter and tier-routing key.
+    binary YES, doubling as drive-by filter and tier-routing key. Always
+    Gemini -- our eval showed Stage 2 is hard for cheaper models.
     Returns one of UPS/FEDEX/AMAZON/USPS/OTHER/NONE. NONE on failure."""
     raw = _gemini_call(image_path, CARRIER_PROMPT, alarm_s)
     if raw is None:

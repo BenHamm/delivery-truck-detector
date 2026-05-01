@@ -82,17 +82,18 @@ def encode_image(path, resize_max=None, quality=75):
 # Gemini call -- returns (raw_response, prompt_tokens, completion_tokens).
 # Token counts come from the API response when available; fall back to None.
 # ---------------------------------------------------------------------------
-def call_gemini(api_key, model, image_b64, prompt, max_tokens=20, retries=4):
+def call_gemini(api_key, model, image_b64, prompt, max_tokens=20, retries=4,
+                base_url="https://openrouter.ai/api/v1"):
     last_err = None
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     for attempt in range(retries):
         try:
             with requests.Session() as s:
                 resp = s.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                    },
+                    f"{base_url.rstrip('/')}/chat/completions",
+                    headers=headers,
                     json={
                         "model": model,
                         "max_tokens": max_tokens,
@@ -147,13 +148,15 @@ def run_case(api_key, case, config):
 
     for _ in range(config["trials"]):
         raw, p, c = call_gemini(api_key, config["binary_model"], tent,
-                                config["binary_prompt"], config["max_tokens"])
+                                config["binary_prompt"], config["max_tokens"],
+                                base_url=config["binary_base_url"])
         stage1_results.append(parse_binary(raw))
         if p: tokens_in += p
         if c: tokens_out += c
 
         raw, p, c = call_gemini(api_key, config["carrier_model"], conf,
-                                config["carrier_prompt"], config["max_tokens"])
+                                config["carrier_prompt"], config["max_tokens"],
+                                base_url=config["carrier_base_url"])
         stage2_results.append(parse_carrier(raw))
         if p: tokens_in += p
         if c: tokens_out += c
@@ -316,10 +319,13 @@ def build_config(args):
         if args.jpeg_quality != 75:
             label_parts.append(f"q={args.jpeg_quality}")
 
+    default_base = args.openai_base_url or "https://openrouter.ai/api/v1"
     return {
         "label": " ".join(label_parts) if label_parts else "default",
         "binary_model": args.binary_model or args.model,
         "carrier_model": args.carrier_model or args.model,
+        "binary_base_url": args.binary_base_url or default_base,
+        "carrier_base_url": args.carrier_base_url or default_base,
         "binary_prompt": binary_prompt,
         "carrier_prompt": carrier_prompt,
         "resize_max": parse_resize(args.resize),
@@ -335,6 +341,12 @@ def main():
                    help="Model ID for both stages unless overridden")
     p.add_argument("--binary-model", default=None, help="Override model for Stage 1 only")
     p.add_argument("--carrier-model", default=None, help="Override model for Stage 2 only")
+    p.add_argument("--openai-base-url", default=None,
+                   help="OpenAI-compatible base URL for both stages "
+                        "(default: https://openrouter.ai/api/v1). Use e.g. "
+                        "http://100.118.29.32:8080/v1 to hit a local llama-server.")
+    p.add_argument("--binary-base-url", default=None, help="Per-stage override")
+    p.add_argument("--carrier-base-url", default=None, help="Per-stage override")
     p.add_argument("--resize", default=None,
                    help="WxH to thumbnail-fit images before sending (e.g. 800x450). "
                         "Default: send raw bytes (matches production).")
@@ -354,14 +366,16 @@ def main():
     p.add_argument("--dataset", default=str(HERE / "dataset.json"))
     args = p.parse_args()
 
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
-        print("ERROR: set OPENROUTER_API_KEY", file=sys.stderr)
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    config = build_config(args)
+    needs_openrouter_key = any("openrouter" in url for url in
+                               (config["binary_base_url"], config["carrier_base_url"]))
+    if needs_openrouter_key and not api_key:
+        print("ERROR: set OPENROUTER_API_KEY (an OpenRouter URL is configured)", file=sys.stderr)
         sys.exit(1)
 
     dataset = json.loads(pathlib.Path(args.dataset).read_text())
     cases = dataset["cases"]
-    config = build_config(args)
 
     print(f"Running {len(cases)} cases x {config['trials']} trials x 2 stages = "
           f"{len(cases) * config['trials'] * 2} API calls")

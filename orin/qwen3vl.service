@@ -1,0 +1,56 @@
+[Unit]
+Description=Qwen3-VL-8B llama-server (Stage 1 binary classifier)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=orin
+Group=orin
+WorkingDirectory=/home/orin/qwen3-vl
+
+# llama-server runs the OpenAI-compatible HTTP endpoint.
+# --host 0.0.0.0 binds to all interfaces -- Tailscale ACL is the
+#   network-level guard; the Pi reaches us via Tailscale subnet route.
+#   If you need to lock this down further, restrict at the firewall layer.
+# --port 8080 is well-clear of HA (8123), mosquitto (1883), and OpenClaw
+#   (18789-18790).
+# -ngl 99 offloads all layers to GPU.
+# -c 8192 context window (image + prompt fits comfortably).
+# -ctk q8_0 -ctv q8_0 quantize KV cache to save memory; recommended by
+#   the WayBob Jetson recipe.
+# --no-mmap avoids loading the whole model into pagecache (zram swap can
+#   fight with mmap on Jetson).
+ExecStart=/home/orin/llama.cpp/build/bin/llama-server \
+    --model /home/orin/qwen3-vl/Qwen3VL-8B-Instruct-Q4_K_M.gguf \
+    --mmproj /home/orin/qwen3-vl/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf \
+    --host 0.0.0.0 \
+    --port 8080 \
+    -ngl 99 \
+    -c 8192 \
+    -ctk q8_0 \
+    -ctv q8_0 \
+    --no-mmap
+
+# Resource hardening: if the model OOMs, ollama / llama-server gets killed,
+# NOT Home Assistant or any other service.
+MemoryMax=14G
+CPUWeight=50
+IOWeight=50
+Nice=10
+
+# Environment
+Environment="PATH=/home/orin/.local/bin:/usr/local/cuda/bin:/usr/bin:/bin"
+Environment="LD_LIBRARY_PATH=/usr/local/cuda/lib64"
+
+# Restart policy: stay up under transient failures.
+Restart=on-failure
+RestartSec=10s
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=qwen3vl
+
+[Install]
+WantedBy=multi-user.target
