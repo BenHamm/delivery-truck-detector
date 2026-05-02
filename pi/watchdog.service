@@ -1,0 +1,11 @@
+[Unit]
+Description=Stage 1 threshold watchdog (rate alerts)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+ExecStart=/usr/bin/python3 /home/pi/watchdog.py
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=watchdog

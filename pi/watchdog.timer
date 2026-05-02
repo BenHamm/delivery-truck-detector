@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Stage 1 threshold watchdog every 5 minutes
+
+[Timer]
+OnBootSec=60s
+OnUnitActiveSec=5min
+Persistent=false
+
+[Install]
+WantedBy=timers.target
