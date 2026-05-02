@@ -68,14 +68,16 @@ def build_journal_index(lines):
 
 
 def find_nearest_journal_event(events, ts_match, kind_filter):
-    """Find the journal event closest in time to ts_match that matches kind."""
+    """Find the journal event closest in time to ts_match that matches kind.
+    Frame filename timestamps are tz-naive local time; journal short-iso
+    timestamps are tz-aware. Strip the tz to compare."""
     best = None
     best_dt = None
     for e in events:
         if not kind_filter(e["msg"]):
             continue
         try:
-            etime = datetime.datetime.fromisoformat(e["ts"])
+            etime = datetime.datetime.fromisoformat(e["ts"]).replace(tzinfo=None)
         except ValueError:
             continue
         delta = abs((etime - ts_match).total_seconds())
@@ -148,10 +150,11 @@ def main():
             "gate_backend": gate_backend,
             "gate_dt_seconds": gate_dt,
             "carrier_msg": carrier_event["msg"] if carrier_event else None,
-            "fired_notification": notify_event is not None and (
-                carrier_event and abs((datetime.datetime.fromisoformat(carrier_event["ts"]) -
-                                       datetime.datetime.fromisoformat(notify_event["ts"])).total_seconds()) < 30
-                if carrier_event else False
+            "fired_notification": (
+                notify_event is not None and carrier_event is not None and
+                abs((datetime.datetime.fromisoformat(carrier_event["ts"]).replace(tzinfo=None) -
+                     datetime.datetime.fromisoformat(notify_event["ts"]).replace(tzinfo=None)
+                     ).total_seconds()) < 30
             ),
         }
         entries.append(entry)
