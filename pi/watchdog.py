@@ -70,7 +70,12 @@ def main():
     yes = counts["yes"]
     orin_gates = counts["orin_gates"]
     fallbacks = counts["fallbacks"]
-    fallback_rate = fallbacks / orin_gates * 100 if orin_gates else 0.0
+    # Fraction of *intended* Orin calls that actually fell back. When Orin
+    # is fully down, orin_gates=0 and ALL traffic is fallbacks -- we need
+    # this to register as 100%, not "no data".
+    intended_orin_calls = orin_gates + fallbacks
+    fallback_rate = (fallbacks / intended_orin_calls * 100
+                     if intended_orin_calls else 0.0)
 
     print(f"WATCHDOG: 1h window  gates={gates} yes={yes} orin={orin_gates} "
           f"fallbacks={fallbacks} ({fallback_rate:.1f}%) "
@@ -80,10 +85,10 @@ def main():
     if yes > HIGH_FIRE_PER_HOUR:
         alerts.append(f"HIGH_FIRE: {yes} YES verdicts in last 1h "
                       f"(threshold >{HIGH_FIRE_PER_HOUR}). Stage 1 model may be broken.")
-    if orin_gates > 0 and fallback_rate > FALLBACK_RATE_PCT:
-        alerts.append(f"HIGH_FALLBACK: {fallback_rate:.1f}% of orin calls fell back "
-                      f"(threshold >{FALLBACK_RATE_PCT:.0f}%, {fallbacks}/{orin_gates}). "
-                      f"Orin endpoint flaky.")
+    if intended_orin_calls > 0 and fallback_rate > FALLBACK_RATE_PCT:
+        alerts.append(f"HIGH_FALLBACK: {fallback_rate:.1f}% of intended orin calls fell "
+                      f"back (threshold >{FALLBACK_RATE_PCT:.0f}%, {fallbacks}/{intended_orin_calls}). "
+                      f"{'Orin endpoint DOWN' if orin_gates == 0 else 'Orin endpoint flaky'}.")
     if disagreements:
         alerts.append(f"SHADOW_DISAGREE: {len(disagreements)} disagreements in last 1h. "
                       f"First: {disagreements[0]}")
