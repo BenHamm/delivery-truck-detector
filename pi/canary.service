@@ -1,0 +1,14 @@
+[Unit]
+Description=Orin Stage 1 canary check (one-shot)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+Environment=ORIN_BASE_URL=http://100.118.29.32:8080/v1
+Environment=ORIN_MODEL=qwen3-vl
+Environment=CANARY_FRAMES_DIR=/home/pi/canary-frames
+ExecStart=/usr/bin/python3 /home/pi/canary.py
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=canary

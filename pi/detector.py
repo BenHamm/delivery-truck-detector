@@ -42,6 +42,13 @@ OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-3-flash-pre
 ORIN_BASE_URL = os.environ.get("ORIN_BASE_URL", "")  # e.g. http://100.118.29.32:8080/v1
 ORIN_MODEL = os.environ.get("ORIN_MODEL", "qwen3-vl")  # llama-server ignores name but it goes in the request
 
+# Shadow mode: when enabled, every Orin Stage 1 call is mirrored against
+# Gemini (with the restrictive prompt) for parity comparison. Disagreements
+# are logged loudly so we can see real-traffic gaps the eval suite missed.
+# Costs an extra ~$0.001 per poll. Default off; turn on for 24-48h after a
+# config change, then turn off.
+SHADOW_GEMINI = os.environ.get("SHADOW_GEMINI", "").strip() in ("1", "true", "yes")
+
 # Pushover — two recipient tiers
 # PUSHOVER_USER_KEY: the "premium" tier (UPS + FedEx only). Greg's account, or
 #   eventually a Delivery Group of users who don't want Amazon spam.
@@ -248,13 +255,31 @@ def is_delivery_truck(image_path, alarm_s=25):
     ORIN_BASE_URL is unset, this is identical to the all-Gemini path.
 
     Failures of BOTH backends return False -- the systemd watchdog and
-    healthcheck catch sustained outages."""
+    healthcheck catch sustained outages.
+
+    When SHADOW_GEMINI is enabled, every successful Orin call is mirrored
+    against Gemini and disagreements are logged. The Orin verdict still
+    drives the actual firing decision; Gemini only watches."""
     if ORIN_BASE_URL:
         raw = _orin_call(image_path, BINARY_PROMPT_PERMISSIVE)
         if raw is not None:
             is_yes = "YES" in raw
             log.info("Gate (orin): %r -> %s", raw[:30], "YES" if is_yes else "NO")
             ping_healthcheck()
+            if SHADOW_GEMINI:
+                shadow_raw = _gemini_call(image_path, BINARY_PROMPT, alarm_s=10)
+                if shadow_raw is not None:
+                    shadow_yes = "YES" in shadow_raw
+                    if shadow_yes != is_yes:
+                        # Disagreement: log image filename so we can review later.
+                        log.warning("SHADOW DISAGREE: orin=%s gemini=%s frame=%s",
+                                    "YES" if is_yes else "NO",
+                                    "YES" if shadow_yes else "NO",
+                                    image_path)
+                    else:
+                        log.info("Shadow: agree=%s", "YES" if is_yes else "NO")
+                else:
+                    log.warning("Shadow Gemini call failed; not counting")
             return is_yes
         log.warning("Orin Stage 1 unavailable -- falling back to Gemini")
 
