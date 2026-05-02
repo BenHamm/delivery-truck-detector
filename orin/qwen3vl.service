@@ -21,6 +21,11 @@ WorkingDirectory=/home/orin/qwen3-vl
 #   the WayBob Jetson recipe.
 # --no-mmap avoids loading the whole model into pagecache (zram swap can
 #   fight with mmap on Jetson).
+# --cache-ram 0 DISABLES the prompt cache. Default is 8 GiB which grows
+#   ~78 MiB per unique image. Our workload has zero cache reuse (every
+#   poll is a fresh frame), so the cache is pure waste -- and on May 2 it
+#   filled overnight to the 8 GiB ceiling, combined with the model and
+#   activations to hit the cgroup MemoryMax and crash the host.
 ExecStart=/home/orin/llama.cpp/build/bin/llama-server \
     --model /home/orin/qwen3-vl/Qwen3VL-8B-Instruct-Q4_K_M.gguf \
     --mmproj /home/orin/qwen3-vl/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf \
@@ -30,11 +35,16 @@ ExecStart=/home/orin/llama.cpp/build/bin/llama-server \
     -c 8192 \
     -ctk q8_0 \
     -ctv q8_0 \
+    --cache-ram 0 \
     --no-mmap
 
-# Resource hardening: if the model OOMs, ollama / llama-server gets killed,
-# NOT Home Assistant or any other service.
-MemoryMax=14G
+# Resource hardening: if the model OOMs, llama-server gets killed, NOT
+# Home Assistant or any other service. Tightened from 14G -> 8G after
+# the May 2 incident -- the model is ~5.3 GB and with --cache-ram 0
+# the steady state is ~6.5 GB, so 8G leaves comfortable headroom while
+# making the cgroup limit much less likely to interact with the
+# system OOM-killer.
+MemoryMax=8G
 CPUWeight=50
 IOWeight=50
 Nice=10
