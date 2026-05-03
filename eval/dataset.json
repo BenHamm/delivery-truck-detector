@@ -279,6 +279,28 @@
       "expected_carrier": "FEDEX",
       "should_fire": true,
       "expected_tier": "premium"
+    },
+    {
+      "id": "may02_amazon_dsp_evening",
+      "category": "real_delivery",
+      "description": "Real Amazon DSP-style delivery van, May 2 6:31pm. Dark navy van parked bottom-left of frame, partially occluded by the wood picture frame in the window foreground. Same DSP-pattern as apr30_amazon_real. Production fired all-tier (correct).",
+      "tentative_frame": "frames/may02/amazon_dsp_evening_tentative.jpg",
+      "confirm_frame": "frames/may02/amazon_dsp_evening_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "AMAZON",
+      "should_fire": true,
+      "expected_tier": "all"
+    },
+    {
+      "id": "may02_ups_misread_as_amazon",
+      "category": "real_delivery",
+      "description": "Real UPS truck, May 2 6:44pm. UPS package car visible in lower-right of frame, heavily occluded by the wood picture frame in the window foreground -- only a slice visible. Stage 1 (Orin Qwen permissive) correctly fired YES; Stage 2 (Gemini) misread the partial brown view as AMAZON, sending notification to all-tier instead of premium. Tracks Stage 2 brittleness on heavily occluded carriers (sibling case to apr29_fedex_partial_arrival, where Gemini returns OTHER on partial FedEx).",
+      "tentative_frame": "frames/may02/ups_misread_as_amazon_tentative.jpg",
+      "confirm_frame": "frames/may02/ups_misread_as_amazon_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "UPS",
+      "should_fire": true,
+      "expected_tier": "premium"
     }
   ]
 }
