@@ -5,3 +5,9 @@ __pycache__/
 *.pyc
 /tmp/
 .DS_Store
+
+# Day-trace eval artifacts: ~200 MB tarballs per day, too big for git.
+# Pulled to local Mac (and to /home/pi/traces/ on the Pi); not pushed.
+# See eval/traces/README.md for storage policy.
+eval/traces/*.tar.gz
+eval/traces/2*/
