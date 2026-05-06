@@ -1,0 +1,12 @@
+[Unit]
+Description=Run day-trace ingest at 20:01 PT every day
+
+[Timer]
+# 20:01 local time, 1 minute after detector active hours end (8:00 PM).
+# Running this early matters -- journald rotation can lose verdicts
+# within a couple of hours.
+OnCalendar=*-*-* 20:01:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

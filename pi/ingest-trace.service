@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily day-trace ingest (oneshot)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+ExecStart=/usr/bin/python3 /home/pi/ingest_day_trace.py today
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ingest-trace

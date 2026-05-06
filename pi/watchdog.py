@@ -28,8 +28,15 @@ import sys
 from collections import Counter
 
 # Thresholds (see module docstring for derivation).
-HIGH_FIRE_PER_HOUR = 15
+# HIGH_TRACKED is the post-Stage-2 fire rate -- Stage 1 YES followed by
+# carrier classification of UPS/FEDEX/AMAZON. This is the rate at which
+# we'd actually notify Greg. May 5 incident: a USPS truck idled for ~3h
+# producing 35 raw Stage 1 YES with zero tracked-carrier verdicts; old
+# rule (>15 raw YES/hr) spammed alerts even though the system handled
+# the case correctly. The right signal is *what we notified on*.
+HIGH_TRACKED_PER_HOUR = 8
 FALLBACK_RATE_PCT = 10.0
+TRACKED_CARRIERS = {"UPS", "FEDEX", "AMAZON"}
 
 
 def journal_last_hour():
@@ -58,6 +65,11 @@ def main():
                 counts["orin_gates"] += 1
             if msg.rstrip().endswith("YES"):
                 counts["yes"] += 1
+        elif msg.startswith("Carrier:"):
+            # "Carrier: 'UPS' -> UPS"  -- pull verdict after the arrow
+            verdict = msg.rsplit("->", 1)[-1].strip()
+            if verdict in TRACKED_CARRIERS:
+                counts["tracked"] += 1
         elif "falling back to Gemini" in msg:
             counts["fallbacks"] += 1
         elif msg.startswith("Shadow:"):
@@ -77,14 +89,16 @@ def main():
     fallback_rate = (fallbacks / intended_orin_calls * 100
                      if intended_orin_calls else 0.0)
 
-    print(f"WATCHDOG: 1h window  gates={gates} yes={yes} orin={orin_gates} "
-          f"fallbacks={fallbacks} ({fallback_rate:.1f}%) "
+    tracked = counts["tracked"]
+    print(f"WATCHDOG: 1h window  gates={gates} yes={yes} tracked={tracked} "
+          f"orin={orin_gates} fallbacks={fallbacks} ({fallback_rate:.1f}%) "
           f"shadow_agree={counts['shadow_agree']} shadow_disagree={counts['shadow_disagree']}")
 
     alerts = []
-    if yes > HIGH_FIRE_PER_HOUR:
-        alerts.append(f"HIGH_FIRE: {yes} YES verdicts in last 1h "
-                      f"(threshold >{HIGH_FIRE_PER_HOUR}). Stage 1 model may be broken.")
+    if tracked > HIGH_TRACKED_PER_HOUR:
+        alerts.append(f"HIGH_TRACKED: {tracked} tracked-carrier verdicts in last 1h "
+                      f"(threshold >{HIGH_TRACKED_PER_HOUR}). Likely a real delivery surge or "
+                      f"a Stage 2 hallucination -- worth eyeballing.")
     if intended_orin_calls > 0 and fallback_rate > FALLBACK_RATE_PCT:
         alerts.append(f"HIGH_FALLBACK: {fallback_rate:.1f}% of intended orin calls fell "
                       f"back (threshold >{FALLBACK_RATE_PCT:.0f}%, {fallbacks}/{intended_orin_calls}). "
