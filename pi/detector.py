@@ -521,8 +521,12 @@ def main():
                 # incident); carrier was rock-solid on the same frames.
                 # Carrier doubles as the routing key.
                 save_detection(tmp_path, "YES", suffix="_tentative")
-                log.info("Tentative YES — confirming in 5s...")
-                time.sleep(5)
+                # Skip the explicit sleep: Orin Stage 1 takes ~11s + ffmpeg
+                # adds another ~3-5s, so the confirm grab is already ~15s
+                # after the tentative capture -- plenty of temporal gap
+                # for drive-by filtering. The 5s wait was calibrated for
+                # the old all-Gemini architecture where Stage 1 was ~2s.
+                log.info("Tentative YES — grabbing confirm frame...")
                 try:
                     grab_frame(rtsp_url, tmp_path)
                     carrier = classify_carrier(tmp_path, alarm_s=15)
