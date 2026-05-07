@@ -1,9 +1,23 @@
 {
   "version": 1,
   "description": "Labeled cases for evaluating the two-stage delivery-truck-detector pipeline. Each case carries a tentative frame (Stage 1 binary input) and a confirm frame (Stage 2 carrier input). For single-frame cases (e.g. confirmed catches with no separate tentative on hand), the same frame is used for both stages -- still meaningful since Stage 1 should fire YES and Stage 2 should classify the carrier correctly.",
-  "carrier_set": ["UPS", "FEDEX", "AMAZON", "USPS", "OTHER", "NONE"],
-  "tracked_carriers": ["UPS", "FEDEX", "AMAZON"],
-  "premium_carriers": ["UPS", "FEDEX"],
+  "carrier_set": [
+    "UPS",
+    "FEDEX",
+    "AMAZON",
+    "USPS",
+    "OTHER",
+    "NONE"
+  ],
+  "tracked_carriers": [
+    "UPS",
+    "FEDEX",
+    "AMAZON"
+  ],
+  "premium_carriers": [
+    "UPS",
+    "FEDEX"
+  ],
   "cases": [
     {
       "id": "apr24_fedex_real",
@@ -301,6 +315,303 @@
       "expected_carrier": "UPS",
       "should_fire": true,
       "expected_tier": "premium"
+    },
+    {
+      "id": "may01_amazon_morning",
+      "category": "real_delivery",
+      "description": "Real AMAZON delivery, 2026-05-01 11:56am. Caught by Orin permissive Stage 1 + Gemini Stage 2 in production. User-verified correct carrier classification.",
+      "tentative_frame": "frames/may01/amazon_morning_tentative.jpg",
+      "confirm_frame": "frames/may01/amazon_morning_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "AMAZON",
+      "should_fire": true,
+      "expected_tier": "all"
+    },
+    {
+      "id": "may01_fedex_lunch",
+      "category": "real_delivery",
+      "description": "Real FEDEX delivery, 2026-05-01 12:49pm. Caught by Orin permissive Stage 1 + Gemini Stage 2 in production. User-verified correct carrier classification.",
+      "tentative_frame": "frames/may01/fedex_lunch_tentative.jpg",
+      "confirm_frame": "frames/may01/fedex_lunch_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "FEDEX",
+      "should_fire": true,
+      "expected_tier": "premium"
+    },
+    {
+      "id": "may01_fedex_afternoon",
+      "category": "real_delivery",
+      "description": "Real FEDEX delivery, 2026-05-01 2:03pm. Caught by Orin permissive Stage 1 + Gemini Stage 2 in production. User-verified correct carrier classification.",
+      "tentative_frame": "frames/may01/fedex_afternoon_tentative.jpg",
+      "confirm_frame": "frames/may01/fedex_afternoon_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "FEDEX",
+      "should_fire": true,
+      "expected_tier": "premium"
+    },
+    {
+      "id": "may02_fedex_afternoon",
+      "category": "real_delivery",
+      "description": "Real FEDEX delivery, 2026-05-02 1:56pm. Caught by Orin permissive Stage 1 + Gemini Stage 2 in production. User-verified correct carrier classification.",
+      "tentative_frame": "frames/may02/fedex_afternoon_tentative.jpg",
+      "confirm_frame": "frames/may02/fedex_afternoon_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "FEDEX",
+      "should_fire": true,
+      "expected_tier": "premium"
+    },
+    {
+      "id": "may04_amazon_first",
+      "category": "real_delivery",
+      "description": "Real AMAZON delivery, 2026-05-04 11:37am. Caught by Orin permissive Stage 1 + Gemini Stage 2 in production. User-verified correct carrier classification.",
+      "tentative_frame": "frames/may04/amazon_first_tentative.jpg",
+      "confirm_frame": "frames/may04/amazon_first_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "AMAZON",
+      "should_fire": true,
+      "expected_tier": "all"
+    },
+    {
+      "id": "may04_amazon_second",
+      "category": "real_delivery",
+      "description": "Real AMAZON delivery, 2026-05-04 11:48am. Caught by Orin permissive Stage 1 + Gemini Stage 2 in production. User-verified correct carrier classification.",
+      "tentative_frame": "frames/may04/amazon_second_tentative.jpg",
+      "confirm_frame": "frames/may04/amazon_second_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "AMAZON",
+      "should_fire": true,
+      "expected_tier": "all"
+    },
+    {
+      "id": "may04_fedex_afternoon",
+      "category": "real_delivery",
+      "description": "Real FEDEX delivery, 2026-05-04 1:19pm. Caught by Orin permissive Stage 1 + Gemini Stage 2 in production. User-verified correct carrier classification.",
+      "tentative_frame": "frames/may04/fedex_afternoon_tentative.jpg",
+      "confirm_frame": "frames/may04/fedex_afternoon_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "FEDEX",
+      "should_fire": true,
+      "expected_tier": "premium"
+    },
+    {
+      "id": "may05_amazon_afternoon",
+      "category": "real_delivery",
+      "description": "Real AMAZON delivery, 2026-05-05 2:51pm. Caught by Orin permissive Stage 1 + Gemini Stage 2 in production. User-verified correct carrier classification.",
+      "tentative_frame": "frames/may05/amazon_afternoon_tentative.jpg",
+      "confirm_frame": "frames/may05/amazon_afternoon_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "AMAZON",
+      "should_fire": true,
+      "expected_tier": "all"
+    },
+    {
+      "id": "may05_ups_real",
+      "category": "real_delivery",
+      "description": "Real UPS delivery, 2026-05-05 12:02pm. Caught by Orin permissive Stage 1 + Gemini Stage 2 in production. User-verified correct carrier classification.",
+      "tentative_frame": "frames/may05/ups_real_tentative.jpg",
+      "confirm_frame": "frames/may05/ups_real_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "UPS",
+      "should_fire": true,
+      "expected_tier": "premium"
+    },
+    {
+      "id": "may06_fedex_afternoon",
+      "category": "real_delivery",
+      "description": "Real FEDEX delivery, 2026-05-06 2:02pm. Caught by Orin permissive Stage 1 + Gemini Stage 2 in production. User-verified correct carrier classification.",
+      "tentative_frame": "frames/may06/fedex_afternoon_tentative.jpg",
+      "confirm_frame": "frames/may06/fedex_afternoon_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "FEDEX",
+      "should_fire": true,
+      "expected_tier": "premium"
+    },
+    {
+      "id": "may06_ups_morning",
+      "category": "real_delivery",
+      "description": "Real UPS delivery, 2026-05-06 10:52am. Caught by Orin permissive Stage 1 + Gemini Stage 2 in production. User-verified correct carrier classification.",
+      "tentative_frame": "frames/may06/ups_morning_tentative.jpg",
+      "confirm_frame": "frames/may06/ups_morning_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "UPS",
+      "should_fire": true,
+      "expected_tier": "premium"
+    },
+    {
+      "id": "may01_dismissed_174900",
+      "category": "stage2_dismissed",
+      "description": "Stage2 Dismissed skip case, 2026-05-01 17:49:00. Stage 1 (permissive) fired YES, Stage 2 returned NONE -- end-to-end skip is correct.",
+      "tentative_frame": "frames/may01/dismissed_174900_tentative.jpg",
+      "confirm_frame": "frames/may01/dismissed_174900_confirm.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "NONE",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may02_dismissed_192456",
+      "category": "stage2_dismissed",
+      "description": "Stage2 Dismissed skip case, 2026-05-02 19:24:56. Stage 1 (permissive) fired YES, Stage 2 returned NONE -- end-to-end skip is correct.",
+      "tentative_frame": "frames/may02/dismissed_192456_tentative.jpg",
+      "confirm_frame": "frames/may02/dismissed_192456_confirm.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "NONE",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may02_dismissed_153538",
+      "category": "stage2_dismissed",
+      "description": "Stage2 Dismissed skip case, 2026-05-02 15:35:38. Stage 1 (permissive) fired YES, Stage 2 returned NONE -- end-to-end skip is correct.",
+      "tentative_frame": "frames/may02/dismissed_153538_tentative.jpg",
+      "confirm_frame": "frames/may02/dismissed_153538_confirm.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "NONE",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may04_dismissed_101609",
+      "category": "stage2_dismissed",
+      "description": "Stage2 Dismissed skip case, 2026-05-04 10:16:09. Stage 1 (permissive) fired YES, Stage 2 returned NONE -- end-to-end skip is correct.",
+      "tentative_frame": "frames/may04/dismissed_101609_tentative.jpg",
+      "confirm_frame": "frames/may04/dismissed_101609_confirm.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "NONE",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may04_dismissed_123111",
+      "category": "stage2_dismissed",
+      "description": "Stage2 Dismissed skip case, 2026-05-04 12:31:11. Stage 1 (permissive) fired YES, Stage 2 returned NONE -- end-to-end skip is correct.",
+      "tentative_frame": "frames/may04/dismissed_123111_tentative.jpg",
+      "confirm_frame": "frames/may04/dismissed_123111_confirm.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "NONE",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may05_dismissed_101323",
+      "category": "stage2_dismissed",
+      "description": "Stage2 Dismissed skip case, 2026-05-05 10:13:23. Stage 1 (permissive) fired YES, Stage 2 returned NONE -- end-to-end skip is correct.",
+      "tentative_frame": "frames/may05/dismissed_101323_tentative.jpg",
+      "confirm_frame": "frames/may05/dismissed_101323_confirm.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "NONE",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may05_dismissed_084222",
+      "category": "stage2_dismissed",
+      "description": "Stage2 Dismissed skip case, 2026-05-05 08:42:22. Stage 1 (permissive) fired YES, Stage 2 returned NONE -- end-to-end skip is correct.",
+      "tentative_frame": "frames/may05/dismissed_084222_tentative.jpg",
+      "confirm_frame": "frames/may05/dismissed_084222_confirm.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "NONE",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may06_dismissed_135043",
+      "category": "stage2_dismissed",
+      "description": "Stage2 Dismissed skip case, 2026-05-06 13:50:43. Stage 1 (permissive) fired YES, Stage 2 returned NONE -- end-to-end skip is correct.",
+      "tentative_frame": "frames/may06/dismissed_135043_tentative.jpg",
+      "confirm_frame": "frames/may06/dismissed_135043_confirm.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "NONE",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may04_other_vehicle_174435",
+      "category": "other_vehicle",
+      "description": "Other Vehicle skip case, 2026-05-04 17:44:35. Stage 1 (permissive) fired YES, Stage 2 returned OTHER -- end-to-end skip is correct.",
+      "tentative_frame": "frames/may04/other_vehicle_174435_tentative.jpg",
+      "confirm_frame": "frames/may04/other_vehicle_174435_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "OTHER",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may04_other_vehicle_175450",
+      "category": "other_vehicle",
+      "description": "Other Vehicle skip case, 2026-05-04 17:54:50. Stage 1 (permissive) fired YES, Stage 2 returned OTHER -- end-to-end skip is correct.",
+      "tentative_frame": "frames/may04/other_vehicle_175450_tentative.jpg",
+      "confirm_frame": "frames/may04/other_vehicle_175450_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "OTHER",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may04_other_vehicle_173558",
+      "category": "other_vehicle",
+      "description": "Other Vehicle skip case, 2026-05-04 17:35:58. Stage 1 (permissive) fired YES, Stage 2 returned OTHER -- end-to-end skip is correct.",
+      "tentative_frame": "frames/may04/other_vehicle_173558_tentative.jpg",
+      "confirm_frame": "frames/may04/other_vehicle_173558_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "OTHER",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may04_usps_misread_165724",
+      "category": "usps",
+      "description": "Usps skip case, 2026-05-04 16:57:24. Stage 1 (permissive) fired YES, Stage 2 returned OTHER -- end-to-end skip is correct. [User-verified: actually USPS, system Stage 2 mis-labeled it OTHER. Both verdicts skip so notification outcome is right.]",
+      "tentative_frame": "frames/may04/usps_misread_165724_tentative.jpg",
+      "confirm_frame": "frames/may04/usps_misread_165724_confirm.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "USPS",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may05_other_vehicle_163339",
+      "category": "other_vehicle",
+      "description": "Other Vehicle skip case, 2026-05-05 16:33:39. Stage 1 (permissive) fired YES, Stage 2 returned OTHER -- end-to-end skip is correct.",
+      "tentative_frame": "frames/may05/other_vehicle_163339_tentative.jpg",
+      "confirm_frame": "frames/may05/other_vehicle_163339_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "OTHER",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may05_usps_misread_165851",
+      "category": "usps",
+      "description": "Usps skip case, 2026-05-05 16:58:51. Stage 1 (permissive) fired YES, Stage 2 returned OTHER -- end-to-end skip is correct. [User-verified: actually USPS, system Stage 2 mis-labeled it OTHER. Both verdicts skip so notification outcome is right.]",
+      "tentative_frame": "frames/may05/usps_misread_165851_tentative.jpg",
+      "confirm_frame": "frames/may05/usps_misread_165851_confirm.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "USPS",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may05_usps_misread_165730",
+      "category": "usps",
+      "description": "Usps skip case, 2026-05-05 16:57:30. Stage 1 (permissive) fired YES, Stage 2 returned OTHER -- end-to-end skip is correct. [User-verified: actually USPS, system Stage 2 mis-labeled it OTHER. Both verdicts skip so notification outcome is right.]",
+      "tentative_frame": "frames/may05/usps_misread_165730_tentative.jpg",
+      "confirm_frame": "frames/may05/usps_misread_165730_confirm.jpg",
+      "expected_stage1_yes": false,
+      "expected_carrier": "USPS",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may05_other_vehicle_161927",
+      "category": "other_vehicle",
+      "description": "Other Vehicle skip case, 2026-05-05 16:19:27. Stage 1 (permissive) fired YES, Stage 2 returned OTHER -- end-to-end skip is correct.",
+      "tentative_frame": "frames/may05/other_vehicle_161927_tentative.jpg",
+      "confirm_frame": "frames/may05/other_vehicle_161927_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "OTHER",
+      "should_fire": false,
+      "expected_tier": null
     }
   ]
 }

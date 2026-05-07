@@ -3,6 +3,8 @@
     "label": "baseline",
     "binary_model": "google/gemini-3-flash-preview",
     "carrier_model": "google/gemini-3-flash-preview",
+    "binary_base_url": "https://openrouter.ai/api/v1",
+    "carrier_base_url": "https://openrouter.ai/api/v1",
     "binary_prompt": "Is there a UPS, FedEx, or Amazon delivery vehicle clearly visible in this image? ONLY say YES if you can clearly see one of these carriers' branding (UPS shield, FedEx wordmark, or Amazon smile/Prime logo). Say NO for USPS trucks, unmarked vans, passenger cars, SUVs, and anything else. Reply YES or NO only.",
     "carrier_prompt": "Look at this image. Identify the most prominent delivery vehicle, if any. Reply with ONE word from this list:\n- UPS (brown truck/van with UPS branding)\n- FEDEX (white truck/van with FedEx branding, purple/orange wordmark)\n- AMAZON (dark blue Sprinter or ProMaster van with Amazon smile or Prime logo)\n- USPS (white postal truck with USPS branding)\n- OTHER (delivery-purpose truck/van without identifiable carrier)\n- NONE (no delivery vehicle; parked passenger cars do not count)\nReply with ONLY one word from the list.",
     "resize_max": null,
@@ -10,9 +12,9 @@
     "trials": 5,
     "max_tokens": 20
   },
-  "timestamp": "2026-05-01T11:42:14-0700",
+  "timestamp": "2026-05-06T23:04:47-0700",
   "dataset_version": 1,
-  "n_cases": 25,
+  "n_cases": 38,
   "results": [
     {
       "id": "apr24_fedex_real",
@@ -133,14 +135,14 @@
         "NO"
       ],
       "stage2_results": [
-        "UPS",
         "NONE",
         "UPS",
         "NONE",
-        "NONE"
+        "UPS",
+        "UPS"
       ],
       "stage1_majority": "NO",
-      "stage2_majority": "NONE",
+      "stage2_majority": "UPS",
       "actual_fire": false,
       "actual_tier": null,
       "expected_fire": false,
@@ -369,11 +371,11 @@
       "id": "apr29_fedex_partial_arrival",
       "category": "real_delivery",
       "stage1_results": [
-        "YES",
-        "YES",
-        "YES",
         "NO",
-        "NO"
+        "NO",
+        "NO",
+        "NO",
+        "YES"
       ],
       "stage2_results": [
         "OTHER",
@@ -382,7 +384,7 @@
         "OTHER",
         "OTHER"
       ],
-      "stage1_majority": "YES",
+      "stage1_majority": "NO",
       "stage2_majority": "OTHER",
       "actual_fire": false,
       "actual_tier": null,
@@ -396,10 +398,10 @@
       "id": "apr29_evening_dismissed_a",
       "category": "drive_by",
       "stage1_results": [
-        "NO",
         "YES",
-        "NO",
-        "NO",
+        "YES",
+        "YES",
+        "YES",
         "NO"
       ],
       "stage2_results": [
@@ -409,7 +411,7 @@
         "NONE",
         "NONE"
       ],
-      "stage1_majority": "NO",
+      "stage1_majority": "YES",
       "stage2_majority": "NONE",
       "actual_fire": false,
       "actual_tier": null,
@@ -450,7 +452,7 @@
       "id": "apr29_evening_dismissed_c",
       "category": "drive_by",
       "stage1_results": [
-        "YES",
+        "NO",
         "NO",
         "NO",
         "NO",
@@ -524,7 +526,7 @@
       "expected_fire": true,
       "expected_tier": "all",
       "correct": true,
-      "tokens_in": 11971,
+      "tokens_in": 11970,
       "tokens_out": 20
     },
     {
@@ -688,6 +690,357 @@
       "correct": true,
       "tokens_in": 11970,
       "tokens_out": 15
+    },
+    {
+      "id": "may02_amazon_dsp_evening",
+      "category": "real_delivery",
+      "stage1_results": [
+        "NO",
+        "NO",
+        "NO",
+        "NO",
+        "NO"
+      ],
+      "stage2_results": [
+        "AMAZON",
+        "AMAZON",
+        "AMAZON",
+        "AMAZON",
+        "AMAZON"
+      ],
+      "stage1_majority": "NO",
+      "stage2_majority": "AMAZON",
+      "actual_fire": false,
+      "actual_tier": null,
+      "expected_fire": true,
+      "expected_tier": "all",
+      "correct": false,
+      "tokens_in": 11970,
+      "tokens_out": 20
+    },
+    {
+      "id": "may02_ups_misread_as_amazon",
+      "category": "real_delivery",
+      "stage1_results": [
+        "NO",
+        "NO",
+        "NO",
+        "NO",
+        "NO"
+      ],
+      "stage2_results": [
+        "UPS",
+        "OTHER",
+        "AMAZON",
+        "AMAZON",
+        "AMAZON"
+      ],
+      "stage1_majority": "NO",
+      "stage2_majority": "AMAZON",
+      "actual_fire": false,
+      "actual_tier": null,
+      "expected_fire": true,
+      "expected_tier": "premium",
+      "correct": false,
+      "tokens_in": 11970,
+      "tokens_out": 16
+    },
+    {
+      "id": "may01_amazon_morning",
+      "category": "real_delivery",
+      "stage1_results": [
+        "YES",
+        "YES",
+        "YES",
+        "NO",
+        "YES"
+      ],
+      "stage2_results": [
+        "AMAZON",
+        "OTHER",
+        "AMAZON",
+        "AMAZON",
+        "AMAZON"
+      ],
+      "stage1_majority": "YES",
+      "stage2_majority": "AMAZON",
+      "actual_fire": true,
+      "actual_tier": "all",
+      "expected_fire": true,
+      "expected_tier": "all",
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 18
+    },
+    {
+      "id": "may01_fedex_lunch",
+      "category": "real_delivery",
+      "stage1_results": [
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
+      ],
+      "stage2_results": [
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX"
+      ],
+      "stage1_majority": "YES",
+      "stage2_majority": "FEDEX",
+      "actual_fire": true,
+      "actual_tier": "premium",
+      "expected_fire": true,
+      "expected_tier": "premium",
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 15
+    },
+    {
+      "id": "may01_fedex_afternoon",
+      "category": "real_delivery",
+      "stage1_results": [
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
+      ],
+      "stage2_results": [
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX"
+      ],
+      "stage1_majority": "YES",
+      "stage2_majority": "FEDEX",
+      "actual_fire": true,
+      "actual_tier": "premium",
+      "expected_fire": true,
+      "expected_tier": "premium",
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 15
+    },
+    {
+      "id": "may02_fedex_afternoon",
+      "category": "real_delivery",
+      "stage1_results": [
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
+      ],
+      "stage2_results": [
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX"
+      ],
+      "stage1_majority": "YES",
+      "stage2_majority": "FEDEX",
+      "actual_fire": true,
+      "actual_tier": "premium",
+      "expected_fire": true,
+      "expected_tier": "premium",
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 15
+    },
+    {
+      "id": "may04_amazon_first",
+      "category": "real_delivery",
+      "stage1_results": [
+        "NO",
+        "NO",
+        "NO",
+        "NO",
+        "NO"
+      ],
+      "stage2_results": [
+        "AMAZON",
+        "AMAZON",
+        "AMAZON",
+        "AMAZON",
+        "AMAZON"
+      ],
+      "stage1_majority": "NO",
+      "stage2_majority": "AMAZON",
+      "actual_fire": false,
+      "actual_tier": null,
+      "expected_fire": true,
+      "expected_tier": "all",
+      "correct": false,
+      "tokens_in": 11971,
+      "tokens_out": 20
+    },
+    {
+      "id": "may04_amazon_second",
+      "category": "real_delivery",
+      "stage1_results": [
+        "NO",
+        "NO",
+        "NO",
+        "NO",
+        "NO"
+      ],
+      "stage2_results": [
+        "AMAZON",
+        "AMAZON",
+        "AMAZON",
+        "AMAZON",
+        "AMAZON"
+      ],
+      "stage1_majority": "NO",
+      "stage2_majority": "AMAZON",
+      "actual_fire": false,
+      "actual_tier": null,
+      "expected_fire": true,
+      "expected_tier": "all",
+      "correct": false,
+      "tokens_in": 11970,
+      "tokens_out": 20
+    },
+    {
+      "id": "may04_fedex_afternoon",
+      "category": "real_delivery",
+      "stage1_results": [
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
+      ],
+      "stage2_results": [
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX"
+      ],
+      "stage1_majority": "YES",
+      "stage2_majority": "FEDEX",
+      "actual_fire": true,
+      "actual_tier": "premium",
+      "expected_fire": true,
+      "expected_tier": "premium",
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 15
+    },
+    {
+      "id": "may05_amazon_afternoon",
+      "category": "real_delivery",
+      "stage1_results": [
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
+      ],
+      "stage2_results": [
+        "AMAZON",
+        "AMAZON",
+        "AMAZON",
+        "AMAZON",
+        "AMAZON"
+      ],
+      "stage1_majority": "YES",
+      "stage2_majority": "AMAZON",
+      "actual_fire": true,
+      "actual_tier": "all",
+      "expected_fire": true,
+      "expected_tier": "all",
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 20
+    },
+    {
+      "id": "may05_ups_real",
+      "category": "real_delivery",
+      "stage1_results": [
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
+      ],
+      "stage2_results": [
+        "UPS",
+        "UPS",
+        "UPS",
+        "UPS",
+        "UPS"
+      ],
+      "stage1_majority": "YES",
+      "stage2_majority": "UPS",
+      "actual_fire": true,
+      "actual_tier": "premium",
+      "expected_fire": true,
+      "expected_tier": "premium",
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 10
+    },
+    {
+      "id": "may06_fedex_afternoon",
+      "category": "real_delivery",
+      "stage1_results": [
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
+      ],
+      "stage2_results": [
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX",
+        "FEDEX"
+      ],
+      "stage1_majority": "YES",
+      "stage2_majority": "FEDEX",
+      "actual_fire": true,
+      "actual_tier": "premium",
+      "expected_fire": true,
+      "expected_tier": "premium",
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 15
+    },
+    {
+      "id": "may06_ups_morning",
+      "category": "real_delivery",
+      "stage1_results": [
+        "YES",
+        "YES",
+        "YES",
+        "YES",
+        "YES"
+      ],
+      "stage2_results": [
+        "UPS",
+        "UPS",
+        "UPS",
+        "UPS",
+        "UPS"
+      ],
+      "stage1_majority": "YES",
+      "stage2_majority": "UPS",
+      "actual_fire": true,
+      "actual_tier": "premium",
+      "expected_fire": true,
+      "expected_tier": "premium",
+      "correct": true,
+      "tokens_in": 11970,
+      "tokens_out": 10
     }
   ]
 }
