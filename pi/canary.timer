@@ -1,12 +1,13 @@
 [Unit]
-Description=Run Orin Stage 1 canary every 10 minutes during active hours
+Description=Run Orin Stage 1 canary once per hour (cold inference)
 
 [Timer]
-# Fire 30s after boot, then every 10min. Detector active hours are 8a-8p,
-# but the canary keeps testing the endpoint outside those hours too --
-# catches a model that died overnight before the next active window.
-OnBootSec=30s
-OnUnitActiveSec=10min
+# Fire 5min after boot, then once per hour. Each canary run forces a
+# cache miss (varying prompt nonce) so the full inference path is
+# exercised -- ~22s of llama-server time. Hourly cadence makes
+# collision with production polls a <1%/hour event.
+OnBootSec=5min
+OnUnitActiveSec=1h
 # Don't pile up missed runs after a long sleep
 Persistent=false
 
