@@ -13,6 +13,7 @@ import time
 import glob
 import shutil
 import base64
+import atexit
 import tempfile
 import subprocess
 import logging
@@ -103,14 +104,110 @@ clear_streak = 0
 CLEAR_STREAK_RESET = 3
 
 
-def grab_frame(rtsp_url, output_path):
-    result = subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-rtsp_transport", "tcp",
-         "-i", rtsp_url, "-frames:v", "1", "-update", "1", "-q:v", "5",
-         output_path],
-        capture_output=True, timeout=10)
-    if result.returncode != 0:
-        raise RuntimeError("ffmpeg: " + result.stderr.decode().strip())
+# Long-lived ffmpeg capture: ffmpeg streams the RTSP feed continuously,
+# overwriting CAPTURE_FILE with the latest frame at the camera's framerate.
+# grab_frame() then becomes a near-instant file copy with JPEG validation.
+# Saves ~3-5s per grab vs spawning ffmpeg fresh each time -- a Stage 1
+# YES cycle drops from ~14s wallclock to ~7-8s.
+CAPTURE_FILE = "/tmp/truck_capture.jpg"
+_capture_proc = None
+
+
+def _stop_capture():
+    """Terminate the capture subprocess if running. Registered with
+    atexit so detector shutdown doesn't leave an orphan ffmpeg."""
+    global _capture_proc
+    if _capture_proc is not None and _capture_proc.poll() is None:
+        _capture_proc.terminate()
+        try:
+            _capture_proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            _capture_proc.kill()
+
+
+atexit.register(_stop_capture)
+
+
+def start_capture(rtsp_url):
+    """Spawn (or restart) the long-lived ffmpeg subprocess streaming RTSP
+    to CAPTURE_FILE. Idempotent: replaces any existing process."""
+    global _capture_proc
+    _stop_capture()
+
+    # Kill any orphan ffmpeg from a previous detector run
+    subprocess.run(["pkill", "-f", f"ffmpeg.*{CAPTURE_FILE}"],
+                   capture_output=True)
+    time.sleep(0.3)
+
+    # -vf "fps=2" throttles output to 2 frames/sec (camera RTSP is 15fps).
+    # Saves ~85% of ffmpeg CPU on the Pi while still keeping CAPTURE_FILE
+    # always within 0.5s of "right now" -- way fresher than our 15s+
+    # detection cadence requires.
+    _capture_proc = subprocess.Popen(
+        ["ffmpeg", "-y", "-loglevel", "error",
+         "-rtsp_transport", "tcp",
+         "-i", rtsp_url,
+         "-vf", "fps=2",
+         "-update", "1", "-f", "image2", "-q:v", "5",
+         CAPTURE_FILE],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def _capture_alive(max_age_s=30):
+    """True iff ffmpeg subprocess is alive AND CAPTURE_FILE was updated
+    within max_age_s. False means we should restart."""
+    if _capture_proc is None or _capture_proc.poll() is not None:
+        return False
+    try:
+        age = time.time() - os.path.getmtime(CAPTURE_FILE)
+    except FileNotFoundError:
+        return False
+    return age <= max_age_s
+
+
+def ensure_capture(rtsp_url, wait_for_first_frame_s=15):
+    """Make sure capture is running and producing fresh frames.
+    Returns True on success, False if no frames within wait_for_first_frame_s."""
+    if _capture_alive():
+        return True
+    log.warning("Capture not healthy -- (re)starting ffmpeg")
+    start_capture(rtsp_url)
+    deadline = time.time() + wait_for_first_frame_s
+    while time.time() < deadline:
+        try:
+            if os.path.getsize(CAPTURE_FILE) > 1024 and \
+               (time.time() - os.path.getmtime(CAPTURE_FILE)) < 5:
+                return True
+        except FileNotFoundError:
+            pass
+        time.sleep(0.2)
+    log.error("Capture stream produced no fresh frame within %ds", wait_for_first_frame_s)
+    return False
+
+
+def grab_frame(rtsp_url, output_path, max_retries=10):
+    """Copy the latest streamed frame to output_path. Retries on
+    JPEG-validation failure (rare partial-read race). ~2-6ms per grab
+    when capture is healthy."""
+    if not ensure_capture(rtsp_url):
+        raise RuntimeError("capture stream unavailable")
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            with open(CAPTURE_FILE, "rb") as f:
+                data = f.read()
+            if len(data) > 1024 and data[:2] == b"\xff\xd8" and data[-2:] == b"\xff\xd9":
+                with open(output_path, "wb") as f:
+                    f.write(data)
+                return
+            last_err = f"invalid jpg (size={len(data)})"
+        except (FileNotFoundError, IOError) as e:
+            last_err = str(e)
+        time.sleep(0.05)
+    raise RuntimeError(f"grab_frame failed after {max_retries} attempts: {last_err}")
 
 
 # Stage 1: cheap, calibrated binary gate. The multi-carrier prompt below
