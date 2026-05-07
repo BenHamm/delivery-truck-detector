@@ -42,6 +42,11 @@ OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-3-flash-pre
 ORIN_BASE_URL = os.environ.get("ORIN_BASE_URL", "")  # e.g. http://100.118.29.32:8080/v1
 ORIN_MODEL = os.environ.get("ORIN_MODEL", "qwen3-vl")  # llama-server ignores name but it goes in the request
 
+# Append-only audit log of every notification attempt (sent / cooldown /
+# skipped / failed). Persistent independent of journald rotation so we can
+# always answer "did notifications fire today?" by reading this file.
+AUDIT_LOG = os.environ.get("NOTIFY_AUDIT_LOG", "/home/pi/notifications.log")
+
 # Shadow mode: when enabled, every Orin Stage 1 call is mirrored against
 # Gemini (with the restrictive prompt) for parity comparison. Disagreements
 # are logged loudly so we can see real-traffic gaps the eval suite missed.
@@ -359,6 +364,15 @@ def cleanup_old_detections():
         log.info("Cleaned up %d old detection files", removed)
 
 
+def _audit(line):
+    """Append-only persistent audit line. Survives journald rotation."""
+    try:
+        with open(AUDIT_LOG, "a") as f:
+            f.write(time.strftime("%Y-%m-%dT%H:%M:%S%z") + " " + line + "\n")
+    except Exception as e:
+        log.error("Failed to write audit log: %s", e)
+
+
 def send_notification(image_path, carrier):
     """Route notifications by carrier:
       - UPS, FEDEX  → premium tier (PUSHOVER_USER_KEY) + all tier (PUSHOVER_KEY_ALL)
@@ -367,16 +381,23 @@ def send_notification(image_path, carrier):
 
     Cooldown applies globally (one notification per COOLDOWN window regardless
     of carrier — we don't want a UPS+Amazon back-to-back to ping twice).
+
+    Every call writes an audit line to AUDIT_LOG with the outcome so audits
+    survive journald rotation under heavy load.
     """
     global last_notification_time
 
+    frame_name = os.path.basename(image_path)
+
     if not PUSHOVER_APP_TOKEN:
         log.warning("Pushover not configured (no app token)")
+        _audit(f"carrier={carrier} frame={frame_name} result=no_token")
         return False
 
     now = time.time()
     if now - last_notification_time < COOLDOWN:
         log.info("Cooldown active (%ds left)", int(COOLDOWN - (now - last_notification_time)))
+        _audit(f"carrier={carrier} frame={frame_name} result=cooldown")
         return False
 
     targets = []
@@ -387,10 +408,12 @@ def send_notification(image_path, carrier):
 
     if not targets:
         log.info("No Pushover targets for carrier=%s — skipping notification", carrier)
+        _audit(f"carrier={carrier} frame={frame_name} result=no_targets")
         return False
 
     message = CARRIER_MESSAGES.get(carrier, f"{carrier} delivery vehicle spotted!")
     sent_any = False
+    tier_results = []
     for tier_name, key in targets:
         try:
             with open(image_path, "rb") as f:
@@ -409,11 +432,17 @@ def send_notification(image_path, carrier):
                 )
             if resp.status_code != 200:
                 log.error("Pushover %s tier returned %d: %s", tier_name, resp.status_code, resp.text[:200])
+                tier_results.append(f"{tier_name}:{resp.status_code}")
             else:
                 log.info("Notification sent to %s tier (%s)", tier_name, carrier)
+                tier_results.append(f"{tier_name}:200")
                 sent_any = True
         except Exception as e:
             log.error("Pushover %s tier failed: %s", tier_name, e)
+            tier_results.append(f"{tier_name}:err")
+
+    result = "sent" if sent_any else "failed"
+    _audit(f"carrier={carrier} frame={frame_name} result={result} tiers={','.join(tier_results)}")
 
     if sent_any:
         last_notification_time = now

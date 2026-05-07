@@ -21,11 +21,17 @@ WorkingDirectory=/home/orin/qwen3-vl
 #   the WayBob Jetson recipe.
 # --no-mmap avoids loading the whole model into pagecache (zram swap can
 #   fight with mmap on Jetson).
-# --cache-ram 0 DISABLES the prompt cache. Default is 8 GiB which grows
-#   ~78 MiB per unique image. Our workload has zero cache reuse (every
-#   poll is a fresh frame), so the cache is pure waste -- and on May 2 it
-#   filled overnight to the 8 GiB ceiling, combined with the model and
-#   activations to hit the cgroup MemoryMax and crash the host.
+# --cache-ram 256 caps the prompt cache at 256 MiB. The default of 8 GiB
+#   blew us up on May 2 by accumulating ~78 MiB per unique production
+#   poll until it hit the cgroup MemoryMax. We then disabled it entirely
+#   (--cache-ram 0), which fixed the crash but caused a new problem:
+#   the canary's repeat images (yes.jpg / no.jpg) no longer hit cache,
+#   so each canary run took ~22s of llama-server time and collided with
+#   production polls every 10 min, generating ~17 fallbacks per active
+#   day. 256 MiB holds ~3 cached prompts -- enough to keep the canary's
+#   2 images warm, while LRU evicts production frames immediately
+#   (each is unique, so they never benefit from caching). Best of both:
+#   canary fast, no risk of cache-driven OOM.
 ExecStart=/home/orin/llama.cpp/build/bin/llama-server \
     --model /home/orin/qwen3-vl/Qwen3VL-8B-Instruct-Q4_K_M.gguf \
     --mmproj /home/orin/qwen3-vl/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf \
@@ -35,7 +41,7 @@ ExecStart=/home/orin/llama.cpp/build/bin/llama-server \
     -c 8192 \
     -ctk q8_0 \
     -ctv q8_0 \
-    --cache-ram 0 \
+    --cache-ram 256 \
     --no-mmap
 
 # Resource hardening: if the model OOMs, llama-server gets killed, NOT
