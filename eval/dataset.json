@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Labeled cases for evaluating the two-stage delivery-truck-detector pipeline. Each case carries a tentative frame (Stage 1 binary input) and a confirm frame (Stage 2 carrier input). For single-frame cases (e.g. confirmed catches with no separate tentative on hand), the same frame is used for both stages -- still meaningful since Stage 1 should fire YES and Stage 2 should classify the carrier correctly.",
+  "description": "Labeled cases for evaluating the two-stage delivery-truck-detector pipeline. Each case carries a tentative frame (Stage 1 binary input) and a confirm frame (Stage 2 carrier input, captured ~5-10s after tentative in production). For single-frame cases (legacy: apr24, apr27, synthetics) the same image is used for both stages -- this tests model behavior but CANNOT predict drive-by handling since production's defining feature is that confirm is a fresh capture and a moving vehicle may have left frame. ALL NEW CASES SHOULD BE DUAL-FRAME pairs sourced from real production tentative+confirm captures, so eval results predict end-to-end production behavior including drive-by filtering. As of 2026-05-07: 42/54 cases are dual-frame, 12 are legacy single-frame.",
   "carrier_set": [
     "UPS",
     "FEDEX",
@@ -610,6 +610,17 @@
       "confirm_frame": "frames/may05/other_vehicle_161927_confirm.jpg",
       "expected_stage1_yes": true,
       "expected_carrier": "OTHER",
+      "should_fire": false,
+      "expected_tier": null
+    },
+    {
+      "id": "may07_driveby_van_then_bus",
+      "category": "drive_by",
+      "description": "Drive-by failure, 2026-05-07 8:50am. Tentative (08:50:03): white unmarked delivery-shaped van moving across cross street near stop sign -- Stage 1 correctly fired YES. Confirm (08:50:23, 20s later): van has left frame, yellow school bus now visible at top center (school pickup time). Stage 2 hallucinated UPS on the bus and fired premium-tier notification (false positive). The drive-by detection ARCHITECTURE worked (tentative != confirm scene) but Stage 2 invented a tracked carrier where there was none. Sibling failure mode to apr29_amazon_missed_afternoon (Gemini Stage 2 hallucinates AMAZON on certain empty/non-tracked frames). Tracks Stage 2 hallucination in drive-by scenarios. Expected: should_fire=false (no tracked carrier in confirm).",
+      "tentative_frame": "frames/may07/driveby_van_then_bus_misread_as_ups_tentative.jpg",
+      "confirm_frame": "frames/may07/driveby_van_then_bus_misread_as_ups_confirm.jpg",
+      "expected_stage1_yes": true,
+      "expected_carrier": "NONE",
       "should_fire": false,
       "expected_tier": null
     }
