@@ -1,0 +1,15 @@
+[Unit]
+Description=Lock all Jetson clocks to max (CPU/GPU/EMC at MAXN ceiling)
+DefaultDependencies=no
+After=nvpmodel.service
+Wants=nvpmodel.service
+# Run after qwen3vl loads so we don't fight with model warmup
+After=qwen3vl.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/jetson_clocks
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

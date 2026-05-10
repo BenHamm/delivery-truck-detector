@@ -618,12 +618,15 @@ def main():
                 # incident); carrier was rock-solid on the same frames.
                 # Carrier doubles as the routing key.
                 save_detection(tmp_path, "YES", suffix="_tentative")
-                # Skip the explicit sleep: Orin Stage 1 takes ~11s + ffmpeg
-                # adds another ~3-5s, so the confirm grab is already ~15s
-                # after the tentative capture -- plenty of temporal gap
-                # for drive-by filtering. The 5s wait was calibrated for
-                # the old all-Gemini architecture where Stage 1 was ~2s.
-                log.info("Tentative YES — grabbing confirm frame...")
+                # ~2s wait restores the original drive-by filter spec.
+                # After we moved Orin to MAXN power mode, Stage 1 inference
+                # dropped from ~11s to ~3.5s; without an explicit wait, the
+                # tentative-to-confirm gap collapses to 3.5s -- below the
+                # 5s minimum a 25mph cross-street vehicle takes to clear
+                # the visible area. 2s sleep + ~3.5s inference + ~0.5s
+                # ffmpeg pipe read = ~6s total gap, comfortable margin.
+                log.info("Tentative YES — confirming in 2s...")
+                time.sleep(2)
                 try:
                     grab_frame(rtsp_url, tmp_path)
                     carrier = classify_carrier(tmp_path, alarm_s=15)
