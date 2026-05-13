@@ -45,12 +45,19 @@ ExecStart=/home/orin/llama.cpp/build/bin/llama-server \
     --no-mmap
 
 # Resource hardening: if the model OOMs, llama-server gets killed, NOT
-# Home Assistant or any other service. Tightened from 14G -> 8G after
-# the May 2 incident -- the model is ~5.3 GB and with --cache-ram 0
-# the steady state is ~6.5 GB, so 8G leaves comfortable headroom while
-# making the cgroup limit much less likely to interact with the
-# system OOM-killer.
-MemoryMax=8G
+# Home Assistant or any other service.
+#
+# Sized 12G after the May 13 audit: steady-state working set on Jetson
+# unified memory is ~7.8 GB (model 5.3 + mmproj 0.7 + KV 0.6 +
+# cache 0.25 + CUDA workspace/activations ~1.0). The earlier 8G value
+# was based on a wrong mental model that didn't account for CUDA-side
+# allocations showing up in cgroup memory accounting on Jetson (where
+# unified memory means GPU buffers are charged against the cgroup).
+#
+# Note that the May 2 OOM lesson (cap prompt cache via --cache-ram) is
+# preserved separately and unchanged -- this cap protects against the
+# cache-growth failure mode regardless of MemoryMax.
+MemoryMax=12G
 CPUWeight=50
 IOWeight=50
 Nice=10
