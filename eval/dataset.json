@@ -1375,7 +1375,7 @@
     {
       "id": "may08_fedex_slow_driveby",
       "category": "drive_by",
-      "description": "Slow drive-by FEDEX 2026-05-08 12:25:17. Truck was still visible in confirm frame so Stage 2 returned FEDEX and production fired -- but the truck was driving through, not delivering. Documents the slow-driveby failure mode that the 2s wait + ~3.5s Stage 1 doesn't catch.",
+      "description": "Sequential-events false positive, 2026-05-08 12:25:17. Tentative shows a van in the foreground (not FedEx) that triggered Stage 1. ~6s later in the confirm frame, a FedEx truck is driving past on the cross street -- a coincidental drive-by that Stage 2 caught and fired premium tier on. Production false positive. Documents the failure mode where Stage 1's trigger and Stage 2's verdict come from DIFFERENT vehicles in the tentative-to-confirm gap.",
       "tentative_frame": "frames/may08/fedex_slow_driveby_tentative.jpg",
       "confirm_frame": "frames/may08/fedex_slow_driveby_confirm.jpg",
       "expected_stage1_yes": true,
@@ -1384,26 +1384,26 @@
       "expected_tier": null
     },
     {
-      "id": "may09_amazon_slow_driveby",
-      "category": "drive_by",
-      "description": "Slow drive-by AMAZON 2026-05-09 11:37:31. Truck was still visible in confirm frame so Stage 2 returned AMAZON and production fired -- but the truck was driving through, not delivering. Documents the slow-driveby failure mode that the 2s wait + ~3.5s Stage 1 doesn't catch.",
+      "id": "may09_amazon_lingering",
+      "category": "real_delivery",
+      "description": "Real Amazon van lingering on the cross street, 2026-05-09 11:37:31. Van wasn't actively delivering to our building but was parked/hanging out nearby long enough to register in both tentative and confirm frames. User-verified that this kind of catch IS worth notifying about -- an Amazon presence in the neighborhood likely means activity at one of the surrounding buildings, useful signal.",
       "tentative_frame": "frames/may09/amazon_slow_driveby_tentative.jpg",
       "confirm_frame": "frames/may09/amazon_slow_driveby_confirm.jpg",
       "expected_stage1_yes": true,
       "expected_carrier": "AMAZON",
-      "should_fire": false,
-      "expected_tier": null
+      "should_fire": true,
+      "expected_tier": "all"
     },
     {
-      "id": "may14_amazon_slow_driveby",
-      "category": "drive_by",
-      "description": "Slow drive-by AMAZON 2026-05-14 12:52:58. Truck was still visible in confirm frame so Stage 2 returned AMAZON and production fired -- but the truck was driving through, not delivering. Documents the slow-driveby failure mode that the 2s wait + ~3.5s Stage 1 doesn't catch.",
+      "id": "may14_amazon_real",
+      "category": "real_delivery",
+      "description": "Real Amazon delivery, 2026-05-14 12:52:58. Amazon van visible in both tentative and confirm frames -- user-verified as a legitimate Amazon catch. (Originally mis-flagged as a slow drive-by during contact-sheet review on 2026-05-16; corrected.)",
       "tentative_frame": "frames/may14/amazon_slow_driveby_tentative.jpg",
       "confirm_frame": "frames/may14/amazon_slow_driveby_confirm.jpg",
       "expected_stage1_yes": true,
       "expected_carrier": "AMAZON",
-      "should_fire": false,
-      "expected_tier": null
+      "should_fire": true,
+      "expected_tier": "all"
     }
   ]
 }
