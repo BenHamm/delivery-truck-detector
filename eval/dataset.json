@@ -1408,7 +1408,7 @@
     {
       "id": "may21_usps_misread_as_fedex",
       "category": "usps",
-      "description": "HIGH-SEVERITY false positive, 2026-05-21 5:56pm. A USPS Long Life Vehicle (white boxy postal van) parked on the cross street. Stage 2 misclassified it as FEDEX and fired PREMIUM tier (Greg + Maisie). USPS should NEVER notify -- postal carriers have building access. Same van re-fired at 6:17pm after the 10-min cooldown expired. Worse than the may02 UPS->Amazon misread (which was at least a real tracked carrier, wrong tier); here a non-tracked carrier triggered tracked-tier alerts. FedEx Ground trucks are also white/boxy, which is the likely confusion. Same vehicle visible in both tentative and confirm (clean dual-frame, not a drive-by).",
+      "description": "USPS misread as FedEx, 2026-05-21 5:56pm. A USPS Long Life Vehicle (white boxy postal van) parked on the cross street; Stage 2 classified it as FEDEX and fired a notification. Same van re-fired at 6:17pm after the cooldown expired. Notable because USPS shouldn't notify at all (postal has building access) -- but the practical impact is minor (one spurious alert). Likely cause: FedEx Ground trucks are also white box vans. Same vehicle in tentative and confirm (clean dual-frame, not a drive-by); purely a Stage 2 carrier-classification miss. Anchors white-box-truck disambiguation for future prompt work.",
       "tentative_frame": "frames/may21/usps_misread_as_fedex_tentative.jpg",
       "confirm_frame": "frames/may21/usps_misread_as_fedex_confirm.jpg",
       "expected_stage1_yes": true,
