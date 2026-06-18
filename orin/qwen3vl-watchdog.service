@@ -1,0 +1,7 @@
+[Unit]
+Description=Restart qwen3vl when /health stops responding
+After=qwen3vl.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/qwen3vl-watchdog.sh

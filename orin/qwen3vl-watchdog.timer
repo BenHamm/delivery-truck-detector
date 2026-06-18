@@ -1,0 +1,10 @@
+[Unit]
+Description=Run qwen3vl /health check every 60s
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=60s
+Unit=qwen3vl-watchdog.service
+
+[Install]
+WantedBy=timers.target
