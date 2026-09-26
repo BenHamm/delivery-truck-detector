@@ -11,3 +11,6 @@ __pycache__/
 # See eval/traces/README.md for storage policy.
 eval/traces/*.tar.gz
 eval/traces/2*/
+eval/traces/_*
+# Distilled day-traces: ~4 GB, kept on the Pi + Mac, never in git.
+eval/traces/distilled/
