@@ -93,10 +93,11 @@ PREMIUM_CARRIERS = {"UPS", "FEDEX"}            # also delivered to PUSHOVER_USER
 NON_TRACKED = {"NONE", "OTHER", "USPS"}        # detected but no notification; rate-limited disk save
 ALL_VERDICTS = TRACKED_CARRIERS | NON_TRACKED
 
+# Pushover renders \n as a line break in the message body.
 CARRIER_MESSAGES = {
-    "UPS":    "UPS truck spotted! Go grab your package!",
-    "FEDEX":  "FedEx truck spotted! Go grab your package!",
-    "AMAZON": "Amazon van spotted! Go grab your package!",
+    "UPS":    "UPS truck spotted!\n...also, share me with your neighbors!",
+    "FEDEX":  "FedEx truck spotted!\n...also, share me with your neighbors!",
+    "AMAZON": "Amazon van spotted!\n...also, share me with your neighbors!",
 }
 
 last_notification_time = 0
@@ -111,6 +112,17 @@ CLEAR_STREAK_RESET = 3
 # YES cycle drops from ~14s wallclock to ~7-8s.
 CAPTURE_FILE = "/tmp/truck_capture.jpg"
 _capture_proc = None
+
+# ffmpeg's own stderr, kept on disk for forensics. Before Sep 23 2026 this
+# was DEVNULL at -loglevel error, so when the long-lived capture process
+# started emitting rotated, black-cornered frames mid-run (Sep 22, ~28h into
+# a process started Sep 21 10:03) there was no record of what ffmpeg saw.
+# The camera was fine -- a fresh RTSP grab was upright -- so the fault was
+# inside this process, and we had zero evidence of why.
+# Capped and rotated at spawn so this can never repeat the Sep 3 ENOSPC.
+CAPTURE_LOG = "/home/pi/logs/ffmpeg-capture.log"
+CAPTURE_LOG_MAX_BYTES = 5 * 1024 * 1024
+_capture_log_fh = None
 
 
 def _stop_capture():
@@ -143,8 +155,30 @@ def start_capture(rtsp_url):
     # Saves ~85% of ffmpeg CPU on the Pi while still keeping CAPTURE_FILE
     # always within 0.5s of "right now" -- way fresher than our 15s+
     # detection cadence requires.
+    # -loglevel warning (was: error) so decode/stream complaints are kept.
+    # "+level" prefixes each line with its severity for grepping.
+    global _capture_log_fh
+    try:
+        os.makedirs(os.path.dirname(CAPTURE_LOG), exist_ok=True)
+        if os.path.exists(CAPTURE_LOG) and os.path.getsize(CAPTURE_LOG) > CAPTURE_LOG_MAX_BYTES:
+            os.replace(CAPTURE_LOG, CAPTURE_LOG + ".1")
+        if _capture_log_fh is not None:
+            try:
+                _capture_log_fh.close()
+            except Exception:
+                pass
+        _capture_log_fh = open(CAPTURE_LOG, "a", buffering=1)
+        _capture_log_fh.write(
+            f"\n===== ffmpeg capture spawn {time.strftime('%Y-%m-%dT%H:%M:%S%z')} "
+            f"detector_pid={os.getpid()} =====\n")
+        stderr_target = _capture_log_fh
+    except OSError as e:
+        # Logging must never stop capture from starting.
+        log.warning("Could not open capture log (%s) -- ffmpeg stderr discarded", e)
+        stderr_target = subprocess.DEVNULL
+
     _capture_proc = subprocess.Popen(
-        ["ffmpeg", "-y", "-loglevel", "error",
+        ["ffmpeg", "-y", "-loglevel", "+level+warning",
          "-rtsp_transport", "tcp",
          "-i", rtsp_url,
          "-vf", "fps=2",
@@ -152,8 +186,10 @@ def start_capture(rtsp_url):
          CAPTURE_FILE],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stderr=stderr_target,
     )
+    log.info("Capture ffmpeg started pid=%s -> %s (stderr: %s)",
+             _capture_proc.pid, CAPTURE_FILE, CAPTURE_LOG)
 
 
 def _capture_alive(max_age_s=30):
@@ -421,9 +457,21 @@ def save_detection(image_path, carrier, suffix=""):
     if not suffix and carrier in NON_TRACKED and (now - _last_no_save) < NO_SAMPLE_INTERVAL:
         return False  # rate-limited background sample
 
-    os.makedirs(LOG_DIR, exist_ok=True)
-    ts = time.strftime("%Y%m%d_%H%M%S")
-    shutil.copy(image_path, os.path.join(LOG_DIR, f"{carrier}_{ts}{suffix}.jpg"))
+    # Archival is BEST-EFFORT and must never break detection. Before
+    # Sep 4 2026 this copy could raise (ENOSPC when the card filled), and
+    # because the "_tentative" save is called outside the confirm try
+    # block, the exception unwound to the main loop's handler -- skipping
+    # classification and notification entirely. On Sep 3 2026 that
+    # destroyed all 179 gate-YES events for the full day: Greg and Maisie
+    # got zero alerts while ~3-5 real trucks came and went. Losing a frame
+    # on disk is cosmetic; losing the notification is the whole product.
+    try:
+        os.makedirs(LOG_DIR, exist_ok=True)
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        shutil.copy(image_path, os.path.join(LOG_DIR, f"{carrier}_{ts}{suffix}.jpg"))
+    except OSError as e:
+        log.warning("save_detection failed (archival only, continuing): %s", e)
+        return False
     if not suffix and carrier in NON_TRACKED:
         _last_no_save = now
     return True
