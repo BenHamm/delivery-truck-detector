@@ -100,6 +100,53 @@ def query(image_path):
     return parsed, raw, elapsed
 
 
+# --- Stage 2 (carrier classifier) ------------------------------------------
+# Added Sep 4 2026. Until now the canary only exercised the Stage 1 binary
+# gate on the Orin, so a Stage 2 regression was invisible: Gemini returning
+# OTHER for every real truck looks exactly like "a quiet week". We found this
+# gap the hard way while diagnosing the Sep 3 outage -- carrier classification
+# had to be tested by hand because nothing tested it automatically.
+#
+# We import detector.classify_carrier rather than reimplementing the call, so
+# the canary exercises the REAL prompt, model, and parsing. Coupling to
+# detector.py is deliberate here: a canary testing a copy of the logic proves
+# nothing about the logic in production.
+CARRIER_FROM_NAME = {"ups": "UPS", "fedex": "FEDEX", "amazon": "AMAZON"}
+
+
+def stage2_case():
+    """Pick one carrier frame whose filename encodes ground truth."""
+    pool = [p for p in sorted(FRAMES_DIR.glob("yes_*.jpg"))
+            if p.stem.replace("yes_", "") in CARRIER_FROM_NAME]
+    if not pool:
+        return None
+    path = random.choice(pool)
+    return path, CARRIER_FROM_NAME[path.stem.replace("yes_", "")]
+
+
+def run_stage2(failures):
+    case = stage2_case()
+    if case is None:
+        print("SKIP stage2: no carrier-labelled frames in rotation set")
+        return
+    path, expected = case
+    try:
+        sys.path.insert(0, "/home/pi")
+        import detector
+        t0 = time.time()
+        got = detector.classify_carrier(str(path), alarm_s=20)
+        elapsed = time.time() - t0
+    except Exception as e:
+        print(f"FAIL stage2 {path.name}: {e}", file=sys.stderr)
+        failures.append(f"stage2:{path.name}")
+        return
+    ok = got == expected
+    print(f"{'PASS' if ok else 'FAIL'} stage2 {path.name}: "
+          f"expect={expected} got={got} ({elapsed:.2f}s)")
+    if not ok:
+        failures.append(f"stage2:{path.name}")
+
+
 def main():
     cases = pick_cases()
     failures = []
@@ -116,11 +163,15 @@ def main():
         print(f"{status} {name}: expect={expected} got={got} ({elapsed:.2f}s) raw={raw!r}")
         if not ok:
             failures.append(name)
+
+    run_stage2(failures)
+    total = len(cases) + 1
+
     if failures:
-        print(f"\nCANARY FAIL: {len(failures)} of {len(cases)} cases failed",
+        print(f"\nCANARY FAIL: {len(failures)} of {total} cases failed",
               file=sys.stderr)
         sys.exit(1)
-    print(f"\nCANARY OK: {len(cases)}/{len(cases)} pass")
+    print(f"\nCANARY OK: {total}/{total} pass")
 
 
 if __name__ == "__main__":
