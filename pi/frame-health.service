@@ -1,0 +1,8 @@
+[Unit]
+Description=Forensic sample of the capture frame (geometry + corner luma)
+After=detector.service
+
+[Service]
+Type=oneshot
+User=pi
+ExecStart=/usr/bin/python3 /home/pi/frame_health.py

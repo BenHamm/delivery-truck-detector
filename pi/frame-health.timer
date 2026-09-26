@@ -1,0 +1,10 @@
+[Unit]
+Description=Sample capture frame health every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Unit=frame-health.service
+
+[Install]
+WantedBy=timers.target
