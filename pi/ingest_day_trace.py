@@ -35,6 +35,23 @@ import tarfile
 DETECTIONS_DIR = pathlib.Path("/home/pi/detections")
 TRACES_DIR = pathlib.Path("/home/pi/traces")
 
+# How many days of trace tarballs to keep. Traces exist for forensics and
+# eval mining, both of which work on recent data. Unbounded retention is
+# what filled the 59G card on Sep 4 2026 -- 124 days of traces (53G) took
+# the root filesystem to 100%, and every detector archival write started
+# failing with ENOSPC. 30 days is ~7G at current volume.
+RETAIN_DAYS = 30
+
+# Frames worth keeping forever. A day-trace is ~1,000 frames / ~200 MB, but
+# ~97% is unsuffixed NONE_* -- the camera watching an empty street. The eval
+# set keys on tentative/confirm pairs, and carrier-prefixed frames are the
+# actual catches. Dropping only unsuffixed NONE_* shrinks a day to ~1-3% while
+# preserving every frame anything has ever read, plus trace.jsonl, which still
+# describes ALL frames (so fire-rate/verdict analysis survives intact).
+# The "-distilled" name deliberately does NOT match the RETAIN_DAYS glob
+# below, so distilled archives are immune to retention pruning.
+DROP_FRAME = re.compile(r"(^|/)NONE_\d{8}_\d{6}\.jpg$")
+
 
 def parse_date(arg):
     if arg in ("today", "now"):
@@ -188,6 +205,69 @@ def main():
     with tarfile.open(tar_path, "w:gz") as tar:
         tar.add(out_dir, arcname=target_date.isoformat())
     print(f"[ingest] tarball: {tar_path} ({tar_path.stat().st_size / 1024 / 1024:.1f} MB)")
+
+    # 7. Drop the uncompressed source dir now that it's archived.
+    #    Before Sep 4 2026 this step didn't exist, so every run left BOTH
+    #    the dir and its tarball on disk -- traces/ grew at 2x the needed
+    #    rate and eventually filled the card. Verify by file count first:
+    #    a truncated tarball must never cost us the only copy.
+    n_src = sum(1 for p in out_dir.rglob("*") if p.is_file())
+    with tarfile.open(tar_path, "r:gz") as tar:
+        n_tar = sum(1 for m in tar.getmembers() if m.isfile())
+    if n_src > 0 and n_tar == n_src:
+        shutil.rmtree(out_dir)
+        print(f"[ingest] verified {n_tar} files in tarball; removed source dir")
+    else:
+        print(f"[ingest] WARNING: tarball/dir mismatch (dir={n_src} tar={n_tar}) "
+              f"-- keeping {out_dir}")
+
+    # 8. Distill: write the permanent small archive alongside the full one.
+    #    Retention (step 9) eventually deletes the 200 MB original; this is
+    #    what survives.
+    dist_path = TRACES_DIR / (tar_path.name[: -len(".tar.gz")] + "-distilled.tar.gz")
+    if not dist_path.exists():
+        kept = dropped = 0
+        try:
+            with tarfile.open(tar_path, "r|gz") as tin, \
+                 tarfile.open(dist_path, "w:gz") as tout:
+                for m in tin:
+                    if not m.isfile():
+                        continue
+                    if DROP_FRAME.search(m.name):
+                        dropped += 1
+                    else:
+                        tout.addfile(m, tin.extractfile(m))
+                        kept += 1
+            print(f"[ingest] distilled: {dist_path.name} kept={kept} dropped={dropped} "
+                  f"({dist_path.stat().st_size / 1024 / 1024:.1f} MB)")
+        except Exception as e:
+            print(f"[ingest] WARNING: distill failed: {e}")
+            dist_path.unlink(missing_ok=True)
+
+    # 9. Retention: prune tarballs older than RETAIN_DAYS.
+    cutoff = target_date - datetime.timedelta(days=RETAIN_DAYS)
+    pruned = freed = 0
+    for old in sorted(TRACES_DIR.glob("????-??-??.tar.gz")):
+        # NB: .stem only strips the LAST suffix, so "2026-05-01.tar.gz"
+        # gives "2026-05-01.tar" -- which fromisoformat rejects, silently
+        # turning this whole loop into a no-op. Strip the full extension.
+        try:
+            d = datetime.date.fromisoformat(old.name[: -len(".tar.gz")])
+        except ValueError:
+            continue
+        if d < cutoff:
+            freed += old.stat().st_size
+            old.unlink()
+            pruned += 1
+            print(f"[ingest] retention: removed {old.name}")
+    if pruned:
+        print(f"[ingest] retention: pruned {pruned} tarball(s) older than "
+              f"{RETAIN_DAYS}d, freed {freed / 1024 / 1024:.0f} MB")
+
+    # 9. Disk report -- cheap signal in the ingest log if we're trending full.
+    st = shutil.disk_usage("/")
+    print(f"[ingest] disk /: {st.free / 1024**3:.1f} GB free "
+          f"({100.0 * st.free / st.total:.1f}%)")
 
 
 if __name__ == "__main__":
