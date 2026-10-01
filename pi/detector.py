@@ -93,11 +93,10 @@ PREMIUM_CARRIERS = {"UPS", "FEDEX"}            # also delivered to PUSHOVER_USER
 NON_TRACKED = {"NONE", "OTHER", "USPS"}        # detected but no notification; rate-limited disk save
 ALL_VERDICTS = TRACKED_CARRIERS | NON_TRACKED
 
-# Pushover renders \n as a line break in the message body.
 CARRIER_MESSAGES = {
-    "UPS":    "UPS truck spotted!\n...also, share me with your neighbors!",
-    "FEDEX":  "FedEx truck spotted!\n...also, share me with your neighbors!",
-    "AMAZON": "Amazon van spotted!\n...also, share me with your neighbors!",
+    "UPS":    "UPS truck spotted!",
+    "FEDEX":  "FedEx truck spotted!",
+    "AMAZON": "Amazon van spotted!",
 }
 
 last_notification_time = 0
